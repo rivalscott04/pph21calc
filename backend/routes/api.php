@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalculatorController;
 use App\Http\Controllers\Api\ConfigController;
+use App\Http\Controllers\Api\CoreTaxController;
 use App\Http\Controllers\Api\EmploymentController;
 use App\Http\Controllers\Api\OrgUnitController;
 use App\Http\Controllers\Api\PayrollController;
@@ -98,6 +99,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Calculator (standalone)
         Route::post('/calculator/pph21', [CalculatorController::class, 'calculatePph21']);
+
+        // CoreTax Integration (with tenant scope)
+        Route::post('/coretax/export', [CoreTaxController::class, 'export']);
+        Route::post('/coretax/upload', [CoreTaxController::class, 'upload']);
+        Route::get('/coretax/logs', [CoreTaxController::class, 'logs']);
+        Route::get('/coretax/logs/{id}', [CoreTaxController::class, 'showLog']);
     });
 });
 

@@ -57,4 +57,12 @@ class Period extends Model
     {
         return $this->hasMany(PayrollCalculation::class);
     }
+
+    /**
+     * Get CoreTax logs for this period
+     */
+    public function coretaxLogs(): HasMany
+    {
+        return $this->hasMany(CoretaxLog::class);
+    }
 }
