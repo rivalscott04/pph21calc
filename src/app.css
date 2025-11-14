@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark, brand;
+}
+
+/* Global styles */
+:root {
+	font-family: system-ui, -apple-system, sans-serif;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+}
+
+/* Brand theme CSS variables (will be overridden dynamically) */
+:root[data-theme="brand"] {
+  --p: 210 92% 56%;
+  --s: 160 84% 39%;
+  --a: 42 96% 56%;
+  --n: 215 16% 27%;
+  --b1: 0 0% 100%;
+}
