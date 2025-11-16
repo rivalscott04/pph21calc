@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasTenantScope;
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Employment extends Model
 {
-    use HasTenantScope;
+    use HasTenantScope, LogsActivity;
 
     protected $fillable = [
         'tenant_id',

@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Traits\HasTenantScope;
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ConfigModule extends Model
 {
-    use HasTenantScope;
+    use HasTenantScope, LogsActivity;
 
     protected $table = 'config_modules';
 

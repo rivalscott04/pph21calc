@@ -37,7 +37,9 @@ class AuthController extends Controller
         // Revoke all existing tokens (optional - for single device login)
         // $user->tokens()->delete();
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        // Create token with expiration (7 days)
+        // Note: If Sanctum expiration config is set, it will override this
+        $token = $user->createToken('auth-token', ['*'], now()->addDays(7))->plainTextToken;
 
         // Get user's tenant info if not superadmin
         $tenantInfo = null;

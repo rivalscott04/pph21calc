@@ -134,6 +134,8 @@ class ConfigController extends Controller
                 'accent' => '#f59e0b',
                 'neutral' => '#3d4451',
                 'base100' => '#ffffff',
+                'button' => '#0ea5e9',
+                'badge' => '#3d4451',
             ]
         );
 
@@ -180,6 +182,8 @@ class ConfigController extends Controller
             'accent' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'neutral' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'base100' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'button' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'badge' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
         $config = ConfigBranding::updateOrCreate(

@@ -1,0 +1,166 @@
+import { auth } from '$lib/stores/auth.js';
+import { toast } from '$lib/stores/toast.js';
+import { goto } from '$app/navigation';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+export interface ApiError {
+	message: string;
+	errors?: Record<string, string[]>;
+	error?: string;
+}
+
+export class ApiClientError extends Error {
+	status: number;
+	errors?: Record<string, string[]>;
+	
+	constructor(message: string, status: number, errors?: Record<string, string[]>) {
+		super(message);
+		this.name = 'ApiClientError';
+		this.status = status;
+		this.errors = errors;
+	}
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+	const contentType = response.headers.get('content-type');
+	const isJson = contentType?.includes('application/json');
+	
+	if (!response.ok) {
+		let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+		let errors: Record<string, string[]> | undefined;
+		
+		if (isJson) {
+			try {
+				const data = await response.json();
+				errorMessage = data.message || data.error || errorMessage;
+				errors = data.errors;
+			} catch (e) {
+				// Ignore JSON parse errors
+			}
+		}
+		
+		// Handle 401 Unauthorized - token expired or invalid
+		if (response.status === 401) {
+			auth.clearAuth();
+			// Only show toast and redirect if we're not already on login page
+			if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+				toast.error('Session expired. Please login again.');
+				goto('/login');
+			}
+			throw new ApiClientError('Unauthorized', 401);
+		}
+		
+		// Handle 403 Forbidden
+		if (response.status === 403) {
+			toast.error('You do not have permission to perform this action.');
+			throw new ApiClientError(errorMessage, 403, errors);
+		}
+		
+		// Handle 422 Validation Error
+		if (response.status === 422) {
+			const errorMessages = errors 
+				? Object.entries(errors).map(([key, values]) => `${key}: ${values.join(', ')}`).join('\n')
+				: errorMessage;
+			toast.error(errorMessages);
+			throw new ApiClientError(errorMessage, 422, errors);
+		}
+		
+		// Handle 500 Server Error
+		if (response.status >= 500) {
+			toast.error('Server error. Please try again later.');
+			throw new ApiClientError(errorMessage, response.status, errors);
+		}
+		
+		// Other errors
+		toast.error(errorMessage);
+		throw new ApiClientError(errorMessage, response.status, errors);
+	}
+	
+	if (isJson) {
+		return await response.json();
+	}
+	
+	return await response.text() as unknown as T;
+}
+
+export async function apiRequest<T>(
+	endpoint: string,
+	options: RequestInit = {}
+): Promise<T> {
+	const token = auth.getToken();
+	
+	const headers: HeadersInit = {
+		'Content-Type': 'application/json',
+		'Accept': 'application/json',
+		...options.headers
+	};
+	
+	if (token) {
+		headers['Authorization'] = `Bearer ${token}`;
+	}
+	
+	const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+	
+	try {
+		const response = await fetch(url, {
+			...options,
+			headers
+		});
+		
+		return await handleResponse<T>(response);
+	} catch (error) {
+		if (error instanceof ApiClientError) {
+			throw error;
+		}
+		
+		// Network error
+		toast.error('Network error. Please check your connection.');
+		throw new ApiClientError('Network error', 0);
+	}
+}
+
+export async function apiGet<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
+	const queryString = params 
+		? '?' + new URLSearchParams(
+			Object.entries(params).reduce((acc, [key, value]) => {
+				if (value !== null && value !== undefined) {
+					acc[key] = String(value);
+				}
+				return acc;
+			}, {} as Record<string, string>)
+		).toString()
+		: '';
+	
+	return apiRequest<T>(`${endpoint}${queryString}`, {
+		method: 'GET'
+	});
+}
+
+export async function apiPost<T>(endpoint: string, data?: any): Promise<T> {
+	return apiRequest<T>(endpoint, {
+		method: 'POST',
+		body: data ? JSON.stringify(data) : undefined
+	});
+}
+
+export async function apiPatch<T>(endpoint: string, data?: any): Promise<T> {
+	return apiRequest<T>(endpoint, {
+		method: 'PATCH',
+		body: data ? JSON.stringify(data) : undefined
+	});
+}
+
+export async function apiPut<T>(endpoint: string, data?: any): Promise<T> {
+	return apiRequest<T>(endpoint, {
+		method: 'PUT',
+		body: data ? JSON.stringify(data) : undefined
+	});
+}
+
+export async function apiDelete<T>(endpoint: string): Promise<T> {
+	return apiRequest<T>(endpoint, {
+		method: 'DELETE'
+	});
+}
+

@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalculatorController;
 use App\Http\Controllers\Api\ConfigController;
 use App\Http\Controllers\Api\CoreTaxController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmploymentController;
 use App\Http\Controllers\Api\OrgUnitController;
 use App\Http\Controllers\Api\PayrollController;
@@ -99,12 +101,27 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Calculator (standalone)
         Route::post('/calculator/pph21', [CalculatorController::class, 'calculatePph21']);
+        Route::post('/calculator/batch', [CalculatorController::class, 'calculateBatch']);
+        Route::get('/calculator/employees', [CalculatorController::class, 'searchEmployees']);
+        Route::post('/calculator/history', [CalculatorController::class, 'saveHistory']);
+        Route::get('/calculator/history', [CalculatorController::class, 'getHistory']);
+        Route::get('/calculator/history/summary', [CalculatorController::class, 'getHistorySummary']);
+        Route::get('/calculator/history/employees', [CalculatorController::class, 'getEmployeeHistoryList']);
+        Route::get('/calculator/history/{employmentId}', [CalculatorController::class, 'getEmployeeHistoryDetail']);
 
         // CoreTax Integration (with tenant scope)
         Route::post('/coretax/export', [CoreTaxController::class, 'export']);
         Route::post('/coretax/upload', [CoreTaxController::class, 'upload']);
         Route::get('/coretax/logs', [CoreTaxController::class, 'logs']);
         Route::get('/coretax/logs/{id}', [CoreTaxController::class, 'showLog']);
+
+        // Activity Logs (with tenant scope)
+        Route::get('/logs/activity', [ActivityLogController::class, 'index']);
+        Route::get('/logs/activity/{id}', [ActivityLogController::class, 'show']);
+
+        // Dashboard (with tenant scope)
+        Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+        Route::get('/dashboard/chart', [DashboardController::class, 'chart']);
     });
 });
 

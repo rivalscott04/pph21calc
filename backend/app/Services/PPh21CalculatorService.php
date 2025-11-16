@@ -77,14 +77,16 @@ class PPh21CalculatorService
     /**
      * Calculate PPh21 for standalone calculator (manual input)
      * 
+     * IMPORTANT: The `bruto` parameter is treated as ANNUAL gross income, not monthly.
+     * 
      * @param string $ptkpCode PTKP code (TK0, K0, K1, etc.)
-     * @param float $bruto Total gross income
-     * @param float $biayaJabatan Biaya jabatan (optional, will be calculated if not provided)
-     * @param float $iuranPensiun Iuran pensiun (optional, will be calculated if not provided)
-     * @param float $zakat Zakat amount
-     * @param int $month Month (1-12, default: 11 for monthly calculation)
+     * @param float $bruto Annual gross income (not monthly)
+     * @param float|null $biayaJabatan Biaya jabatan annual amount (optional, will be calculated if not provided)
+     * @param float|null $iuranPensiun Iuran pensiun annual amount (optional, will be calculated if not provided)
+     * @param float $zakat Annual zakat amount
+     * @param int $month Month (1-12, currently unused but kept for API compatibility)
      * @param bool $hasNpwp Whether employee has NPWP
-     * @return array Calculation result
+     * @return array Calculation result with annual and monthly values
      */
     public function calculateStandalone(
         string $ptkpCode,
@@ -95,58 +97,89 @@ class PPh21CalculatorService
         int $month = 11,
         bool $hasNpwp = true
     ): array {
-        // Calculate deductions if not provided
+        // Calculate deductions if not provided (using ANNUAL limits)
         if ($biayaJabatan === null) {
-            $biayaJabatan = $this->calculateBiayaJabatan($bruto, $month);
+            $biayaJabatan = $this->calculateBiayaJabatanAnnual($bruto);
         } else {
-            // Cap biaya jabatan if provided manually
-            $biayaJabatan = min($biayaJabatan, self::BIAYA_JABATAN_MAX_MONTHLY);
+            // Cap biaya jabatan at annual limit if provided manually
+            $biayaJabatan = min($biayaJabatan, self::BIAYA_JABATAN_MAX_YEARLY);
         }
         
         if ($iuranPensiun === null) {
-            // Create dummy collection for deductions
-            $deductions = collect();
-            $iuranPensiun = $this->calculateIuranPensiun($bruto, $deductions, $month);
+            $iuranPensiun = $this->calculateIuranPensiunAnnual($bruto);
         } else {
-            // Cap iuran pensiun if provided manually
-            $iuranPensiun = min($iuranPensiun, self::IURAN_PENSIUN_MAX_MONTHLY);
+            // Cap iuran pensiun at annual limit if provided manually
+            $iuranPensiun = min($iuranPensiun, self::IURAN_PENSIUN_MAX_YEARLY);
         }
 
-        // Calculate Neto Masa
-        $netoMasa = $bruto - $biayaJabatan - $iuranPensiun - $zakat;
+        // Calculate Neto Year (bruto is already annual)
+        $netoYear = $bruto - $biayaJabatan - $iuranPensiun - $zakat;
 
         // Get PTKP
         $ptkpYearly = $this->getPtkpValue($ptkpCode);
 
-        // Calculate PPh21 (always use monthly calculation for standalone)
-        $netoAnnualized = $netoMasa * 12;
-        $pkpAnnualized = max(0, $netoAnnualized - $ptkpYearly);
-        $pph21Annual = $this->calculateProgressiveTax($pkpAnnualized);
-        $pph21Masa = $pph21Annual / 12;
+        // Calculate PKP (Penghasilan Kena Pajak)
+        $pkpYear = max(0, $netoYear - $ptkpYearly);
+        
+        // CRITICAL: Round PKP DOWN to nearest thousand (UU HPP 2022 requirement)
+        $pkpYear = $this->roundDownToThousand($pkpYear);
+        
+        // Safety check: Ensure PKP never exceeds neto year
+        $pkpYear = min($pkpYear, $netoYear);
+        
+        // Calculate annual PPh21 using progressive tax brackets
+        $pph21Year = $this->calculateProgressiveTax($pkpYear);
 
         // Apply NPWP penalty if no NPWP (20% higher)
         if (!$hasNpwp) {
-            $pph21Masa = $pph21Masa * 1.2;
+            $pph21Year = $pph21Year * 1.2;
         }
 
+        // Calculate monthly PPh21 (divide annual by 12)
+        $pph21Month = $pph21Year / 12;
+
         // Generate notes
-        $notes = $this->generateNotes($ptkpCode, $hasNpwp, $month);
+        $notes = $this->generateNotesStandalone($ptkpCode, $hasNpwp);
 
         return [
             'bruto' => round($bruto, 2),
             'biaya_jabatan' => round($biayaJabatan, 2),
             'iuran_pensiun' => round($iuranPensiun, 2),
             'zakat' => round($zakat, 2),
-            'neto_masa' => round($netoMasa, 2),
+            'neto_year' => round($netoYear, 2),
+            'neto_masa' => round($netoYear, 2), // neto_masa is now annual (same as neto_year) since bruto is annual
             'ptkp_yearly' => $ptkpYearly,
-            'pkp_annualized' => round($pkpAnnualized, 2),
-            'pph21_masa' => round($pph21Masa, 2),
+            'pkp_year' => round($pkpYear, 2),
+            'pkp_annualized' => round($pkpYear, 2), // For backward compatibility
+            'pph21_year' => round($pph21Year, 2),
+            'pph21_masa' => round($pph21Month, 2), // pph21_masa is monthly (annual / 12)
             'notes' => $notes,
         ];
     }
 
     /**
-     * Generate calculation notes
+     * Generate calculation notes for standalone calculator
+     */
+    private function generateNotesStandalone(string $ptkpCode, bool $hasNpwp): array
+    {
+        $notes = [];
+
+        $notes[] = "PTKP: {$ptkpCode} (" . number_format($this->getPtkpValue($ptkpCode), 0, ',', '.') . " per tahun)";
+        
+        if (!$hasNpwp) {
+            $notes[] = "Peringatan: Tidak memiliki NPWP, PPh21 dikenakan tarif 20% lebih tinggi";
+        }
+
+        $notes[] = "Perhitungan berdasarkan penghasilan tahunan";
+        $notes[] = "Biaya Jabatan: 5% dari bruto tahunan, maksimal 6.000.000/tahun";
+        $notes[] = "Iuran Pensiun: 5% dari bruto tahunan, maksimal 2.400.000/tahun";
+        $notes[] = "PKP dibulatkan ke bawah ke ribuan terdekat sesuai UU HPP 2022";
+
+        return $notes;
+    }
+
+    /**
+     * Generate calculation notes (for payroll calculation)
      */
     private function generateNotes(string $ptkpCode, bool $hasNpwp, int $month): array
     {
@@ -185,7 +218,7 @@ class PPh21CalculatorService
     }
 
     /**
-     * Calculate biaya jabatan
+     * Calculate biaya jabatan (for monthly payroll calculation)
      */
     private function calculateBiayaJabatan(float $bruto, int $month): float
     {
@@ -200,7 +233,25 @@ class PPh21CalculatorService
     }
 
     /**
-     * Calculate iuran pensiun (from deductions or calculated)
+     * Calculate biaya jabatan annual (for standalone calculator)
+     * 
+     * @param float $brutoAnnual Annual gross income
+     * @return float Annual biaya jabatan (capped at 6M per year)
+     */
+    private function calculateBiayaJabatanAnnual(float $brutoAnnual): float
+    {
+        $calculated = $brutoAnnual * self::BIAYA_JABATAN_RATE;
+        
+        // Check annual limit
+        if ($calculated > self::BIAYA_JABATAN_MAX_YEARLY) {
+            return self::BIAYA_JABATAN_MAX_YEARLY;
+        }
+
+        return $calculated;
+    }
+
+    /**
+     * Calculate iuran pensiun (from deductions or calculated, for monthly payroll)
      */
     private function calculateIuranPensiun(float $bruto, Collection $deductions, int $month): float
     {
@@ -216,6 +267,18 @@ class PPh21CalculatorService
         // Calculate if not provided
         $calculated = $bruto * self::IURAN_PENSIUN_RATE;
         return min($calculated, self::IURAN_PENSIUN_MAX_MONTHLY);
+    }
+
+    /**
+     * Calculate iuran pensiun annual (for standalone calculator)
+     * 
+     * @param float $brutoAnnual Annual gross income
+     * @return float Annual iuran pensiun (capped at 2.4M per year)
+     */
+    private function calculateIuranPensiunAnnual(float $brutoAnnual): float
+    {
+        $calculated = $brutoAnnual * self::IURAN_PENSIUN_RATE;
+        return min($calculated, self::IURAN_PENSIUN_MAX_YEARLY);
     }
 
     /**
@@ -251,6 +314,12 @@ class PPh21CalculatorService
         // Annualize neto masa
         $netoAnnualized = $netoMasa * 12;
         $pkpAnnualized = max(0, $netoAnnualized - $ptkpYearly);
+        
+        // CRITICAL FIX: Round PKP DOWN to nearest thousand (UU HPP 2022 requirement)
+        $pkpAnnualized = $this->roundDownToThousand($pkpAnnualized);
+        
+        // Ensure PKP never exceeds neto annualized (safety check)
+        $pkpAnnualized = min($pkpAnnualized, $netoAnnualized);
 
         // Calculate annual PPh21
         $pph21Annual = $this->calculateProgressiveTax($pkpAnnualized);
@@ -297,6 +366,12 @@ class PPh21CalculatorService
 
         // Calculate PKP yearly
         $pkpYearly = max(0, $netoYearly - $ptkpYearly);
+        
+        // CRITICAL FIX: Round PKP DOWN to nearest thousand (UU HPP 2022 requirement)
+        $pkpYearly = $this->roundDownToThousand($pkpYearly);
+        
+        // Ensure PKP never exceeds neto yearly (safety check)
+        $pkpYearly = min($pkpYearly, $netoYearly);
 
         // Calculate annual PPh21
         $pph21Yearly = $this->calculateProgressiveTax($pkpYearly);
@@ -322,6 +397,18 @@ class PPh21CalculatorService
             'pph21_ytd' => $pph21Ytd,
             'pph21_settlement_dec' => round($pph21SettlementDec, 2),
         ];
+    }
+
+    /**
+     * Round down to nearest thousand (UU HPP 2022 requirement for PKP)
+     * 
+     * @param float $amount Amount to round down
+     * @return float Rounded down to nearest thousand
+     */
+    private function roundDownToThousand(float $amount): float
+    {
+        // Round down to nearest thousand (divide by 1000, floor, multiply by 1000)
+        return floor($amount / 1000) * 1000;
     }
 
     /**

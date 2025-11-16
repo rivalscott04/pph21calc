@@ -253,16 +253,23 @@ class PayrollController extends Controller
             ->merge($period->deductions->pluck('employment_id'))
             ->unique();
 
+        // Eager load all employments at once to avoid N+1 queries
+        $employments = Employment::with([
+            'person',
+            'payrollSubject',
+        ])
+            ->whereIn('id', $employmentIds)
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy('id');
+
         $calculator = new PPh21CalculatorService();
         $previews = [];
 
         foreach ($employmentIds as $employmentId) {
-            $employment = Employment::with([
-                'person',
-                'payrollSubject',
-            ])->find($employmentId);
+            $employment = $employments->get($employmentId);
 
-            if (!$employment || $employment->tenant_id != $tenantId) {
+            if (!$employment) {
                 continue;
             }
 
@@ -333,13 +340,20 @@ class PayrollController extends Controller
             ->merge($period->deductions->pluck('employment_id'))
             ->unique();
 
+        // Eager load all employments at once to avoid N+1 queries
+        $employments = Employment::with(['payrollSubject'])
+            ->whereIn('id', $employmentIds)
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy('id');
+
         $committed = 0;
 
-        DB::transaction(function () use ($period, $tenantId, $calculator, $employmentIds, &$committed) {
+        DB::transaction(function () use ($period, $tenantId, $calculator, $employmentIds, $employments, &$committed) {
             foreach ($employmentIds as $employmentId) {
-                $employment = Employment::with(['payrollSubject'])->find($employmentId);
+                $employment = $employments->get($employmentId);
 
-                if (!$employment || $employment->tenant_id != $tenantId) {
+                if (!$employment) {
                     continue;
                 }
 

@@ -31,4 +31,11 @@ return [
         ],
     ],
 
+    'coretax' => [
+        'api_url' => env('CORETAX_API_URL', ''),
+        'api_key' => env('CORETAX_API_KEY', ''),
+        'client_id' => env('CORETAX_CLIENT_ID', ''),
+        'client_secret' => env('CORETAX_CLIENT_SECRET', ''),
+    ],
+
 ];

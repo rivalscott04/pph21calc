@@ -148,16 +148,20 @@ class CoreTaxService
     }
 
     /**
-     * Simulate upload to CoreTax (replace with actual API call)
+     * Upload BPA data to CoreTax API
+     * 
+     * NOTE: This requires CoreTax API credentials and endpoint configuration.
+     * Configure the following in .env:
+     * - CORETAX_API_URL=https://api.coretax.djp.go.id
+     * - CORETAX_API_KEY=your_api_key
+     * - CORETAX_CLIENT_ID=your_client_id
+     * - CORETAX_CLIENT_SECRET=your_client_secret
      * 
      * @param array $bpaData
      * @return array Response from CoreTax
      */
     public function uploadToCoreTax(array $bpaData): array
     {
-        // TODO: Replace with actual CoreTax API integration
-        // This is a mock implementation
-        
         $validation = $this->validateBPA($bpaData);
         if (!$validation['valid']) {
             return [
@@ -167,15 +171,88 @@ class CoreTaxService
             ];
         }
 
-        // Mock successful upload
-        $refNo = 'CORETAX-' . date('YmdHis') . '-' . rand(1000, 9999);
-        
-        return [
-            'success' => true,
-            'message' => 'Data berhasil dikirim ke CoreTax',
-            'ref_no' => $refNo,
-            'timestamp' => now()->toIso8601String(),
-        ];
+        // Get CoreTax configuration from environment
+        $apiUrl = config('services.coretax.api_url');
+        $apiKey = config('services.coretax.api_key');
+        $clientId = config('services.coretax.client_id');
+        $clientSecret = config('services.coretax.client_secret');
+
+        // If CoreTax is not configured, return mock response for development
+        if (empty($apiUrl) || empty($apiKey)) {
+            \Log::warning('CoreTax API not configured, using mock response');
+            
+            // Mock successful upload for development/testing
+            $refNo = 'CORETAX-MOCK-' . date('YmdHis') . '-' . rand(1000, 9999);
+            
+            return [
+                'success' => true,
+                'message' => 'Data berhasil dikirim ke CoreTax (MOCK - CoreTax API not configured)',
+                'ref_no' => $refNo,
+                'timestamp' => now()->toIso8601String(),
+            ];
+        }
+
+        try {
+            // TODO: Implement actual CoreTax API integration
+            // Example implementation (uncomment and adjust when CoreTax API is available):
+            /*
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $apiUrl,
+                'timeout' => 30,
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->getAccessToken($clientId, $clientSecret),
+                    'Content-Type' => 'application/json',
+                    'X-API-Key' => $apiKey,
+                ],
+            ]);
+
+            $response = $client->post('/api/v1/bpa/upload', [
+                'json' => $bpaData,
+            ]);
+
+            $responseData = json_decode($response->getBody()->getContents(), true);
+
+            return [
+                'success' => $response->getStatusCode() === 200,
+                'message' => $responseData['message'] ?? 'Data berhasil dikirim ke CoreTax',
+                'ref_no' => $responseData['ref_no'] ?? null,
+                'timestamp' => now()->toIso8601String(),
+                'response' => $responseData,
+            ];
+            */
+
+            // Placeholder: Return error indicating API integration is needed
+            return [
+                'success' => false,
+                'message' => 'CoreTax API integration not yet implemented. Please configure CoreTax credentials and uncomment the API call code.',
+                'errors' => ['API integration pending'],
+            ];
+        } catch (\Exception $e) {
+            \Log::error('CoreTax upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Gagal mengirim data ke CoreTax: ' . $e->getMessage(),
+                'errors' => [$e->getMessage()],
+            ];
+        }
+    }
+
+    /**
+     * Get access token from CoreTax OAuth (if required)
+     * 
+     * @param string $clientId
+     * @param string $clientSecret
+     * @return string
+     */
+    private function getAccessToken(string $clientId, string $clientSecret): string
+    {
+        // TODO: Implement OAuth token retrieval from CoreTax
+        // This is a placeholder method
+        return '';
     }
 }
 

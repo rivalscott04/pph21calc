@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Traits\HasTenantScope;
+use App\Traits\LogsActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class IdentifierScheme extends Model
 {
-    use HasTenantScope;
+    use HasTenantScope, LogsActivity;
 
     /**
      * Include global schemes (tenant_id IS NULL) in tenant scope

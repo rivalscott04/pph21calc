@@ -1,23 +1,294 @@
 @import "tailwindcss";
+/* stylelint-disable-next-line unknownAtRules */
 @plugin "daisyui" {
   themes: light --default, dark --prefersdark, brand;
 }
 
+/* FullCalendar styles */
+@import '@fullcalendar/core/index.css';
+@import '@fullcalendar/daygrid/index.css';
+
+/* FullCalendar custom styling for better readability */
+.fc {
+	color: hsl(0 0% 0%) !important;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+	border-color: hsl(var(--b3));
+}
+
+.fc-theme-standard .fc-scrollgrid {
+	border-color: hsl(var(--b3));
+}
+
+.fc-daygrid-day {
+	background-color: hsl(var(--b1));
+}
+
+.fc-daygrid-day:hover {
+	background-color: hsl(var(--b2));
+}
+
+.fc-daygrid-day:hover .fc-daygrid-day-number {
+	color: #ffffff !important;
+}
+
+.fc-day-today {
+	background-color: hsl(var(--b2)) !important;
+}
+
+.fc-day-today .fc-daygrid-day-number {
+	color: #ffffff !important;
+}
+
+.fc-daygrid-day-number {
+	color: hsl(0 0% 0%) !important;
+	font-weight: 600;
+}
+
+.fc-daygrid-day.fc-day-other .fc-daygrid-day-number {
+	color: hsl(0 0% 50%) !important;
+}
+
+.fc-daygrid-day.fc-day-other:hover .fc-daygrid-day-number {
+	color: #ffffff !important;
+}
+
+.fc-col-header-cell {
+	background-color: hsl(var(--b2));
+	color: hsl(0 0% 0%) !important;
+	font-weight: 600;
+}
+
+.fc-col-header-cell-cushion {
+	color: hsl(0 0% 0%) !important;
+}
+
+.fc-button {
+	background-color: hsl(var(--n)) !important;
+	border-color: hsl(var(--n)) !important;
+	color: #ffffff !important;
+	font-weight: 600;
+	opacity: 1 !important;
+}
+
+.fc-button:hover {
+	background-color: hsl(var(--p)) !important;
+	opacity: 0.9;
+}
+
+.fc-button:disabled {
+	opacity: 0.5;
+}
+
+.fc-button-primary {
+	background-color: hsl(var(--n)) !important;
+	border-color: hsl(var(--n)) !important;
+	color: #ffffff !important;
+}
+
+.fc-button-primary:hover {
+	background-color: hsl(var(--n)) !important;
+	opacity: 0.9;
+}
+
+.fc-toolbar-title {
+	color: #000000 !important;
+	font-weight: 700;
+	font-size: 1.25rem;
+	opacity: 1 !important;
+}
+
+.fc-toolbar-title,
+.fc-toolbar-title * {
+	color: #000000 !important;
+	opacity: 1 !important;
+}
+
+/* Ensure all toolbar elements are visible */
+.fc-toolbar {
+	color: #000000 !important;
+}
+
+.fc-toolbar-chunk {
+	color: #000000 !important;
+}
+
+.fc-toolbar-chunk button,
+.fc-toolbar-chunk .fc-button {
+	color: #000000 !important;
+	opacity: 1 !important;
+}
+
+/* Event styling - ensure text is readable */
+.fc-event {
+	border-radius: 0.375rem;
+	padding: 0.25rem 0.5rem;
+	font-weight: 600;
+	font-size: 0.875rem;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.fc-event:hover {
+	opacity: 0.9;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.fc-event-title {
+	color: #ffffff !important;
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* List view styling */
+.fc-list-event {
+	color: hsl(var(--bc)) !important;
+}
+
+.fc-list-event-title {
+	color: hsl(var(--bc)) !important;
+}
+
+.fc-list-day-text,
+.fc-list-day-side-text {
+	color: hsl(var(--bc)) !important;
+}
+
 /* Global styles */
 :root {
-	font-family: system-ui, -apple-system, sans-serif;
+	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 body {
 	margin: 0;
 	padding: 0;
+	background-color: hsl(var(--b1));
+	color: hsl(var(--bc));
+	font-weight: 500; /* Medium weight for better readability */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
-/* Brand theme CSS variables (will be overridden dynamically) */
+/* Make text more readable with better font weights */
+h1, h2, h3, h4, h5, h6 {
+	font-weight: 700; /* Bold for headings */
+}
+
+p, span, div, a, button, label, input, select, textarea {
+	font-weight: 500; /* Medium weight for body text */
+}
+
+/* Buttons and interactive elements should be more prominent */
+.btn {
+	font-weight: 600; /* Semi-bold for buttons */
+}
+
+/* Menu items should be readable with good contrast - BEST PRACTICE UI/UX */
+.menu a, .menu button {
+	font-weight: 500;
+	color: hsl(var(--n)) !important; /* Dark navy text on light sidebar */
+	transition: all 0.2s ease;
+}
+
+.menu a:hover, .menu button:hover {
+	background-color: hsl(var(--b3));
+	color: hsl(0 0% 100%) !important; /* Pure white text on hover for maximum readability */
+	font-weight: 600;
+}
+
+.menu a.active, .menu button.active {
+	background-color: hsl(var(--p));
+	color: hsl(var(--pc)) !important;
+	font-weight: 600;
+}
+
+/* Ensure menu text is always readable */
+.menu li > a, .menu li > button {
+	color: hsl(var(--n)) !important;
+}
+
+.menu-title {
+	color: hsl(var(--n)) !important; /* Dark navy blue for contrast on white background */
+	opacity: 0.8;
+	font-weight: 600;
+	font-size: 0.875rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	margin-top: 1rem;
+	margin-bottom: 0.5rem;
+	padding: 0.5rem 1rem;
+}
+
+/* Form labels should be clear */
+.label {
+	font-weight: 600;
+}
+
+/* Brand theme CSS variables (will be overridden dynamically by applyBrandTheme) */
 :root[data-theme="brand"] {
-  --p: 210 92% 56%;
-  --s: 160 84% 39%;
-  --a: 42 96% 56%;
-  --n: 215 16% 27%;
-  --b1: 0 0% 100%;
+  --p: 210 92% 56%; /* primary - default sky-500 */
+  --s: 160 84% 39%; /* secondary - default emerald-600 */
+  --a: 42 96% 56%; /* accent - default amber-500 */
+  --n: 215 16% 27%; /* neutral - default gray-700 */
+  --b1: 222 47% 11%; /* base-100 - default dark (daisyUI dark theme) */
+  --b2: 217 33% 17%; /* base-200 */
+  --b3: 216 20% 25%; /* base-300 */
+  
+  /* Content colors */
+  --pc: 0 0% 100%; /* primary-content */
+  --sc: 0 0% 100%; /* secondary-content */
+  --ac: 0 0% 100%; /* accent-content */
+  --nc: 0 0% 100%; /* neutral-content */
+  --bc: 210 40% 95%; /* base-content - bright light text on dark bg for readability */
+  
+  /* Button color - custom branding color */
+  --btn-color: #0ea5e9; /* default button color, will be overridden by applyBrandTheme */
+  
+  /* Badge color - custom branding color */
+  --badge-color: #3d4451; /* default badge color, will be overridden by applyBrandTheme */
+}
+
+/* Apply custom button color to buttons with btn-brand class or buttons without color modifier */
+.btn-brand {
+  background-color: var(--btn-color) !important;
+  border-color: var(--btn-color) !important;
+  color: white !important;
+}
+
+.btn-brand:hover {
+  background-color: var(--btn-color) !important;
+  border-color: var(--btn-color) !important;
+  color: white !important;
+  opacity: 0.9;
+}
+
+.btn-brand:active {
+  background-color: var(--btn-color) !important;
+  border-color: var(--btn-color) !important;
+  color: white !important;
+  opacity: 0.8;
+}
+
+.btn-brand:focus {
+  background-color: var(--btn-color) !important;
+  border-color: var(--btn-color) !important;
+  color: white !important;
+}
+
+/* Apply custom badge color to badges with badge-brand class */
+.badge-brand {
+  background-color: var(--badge-color) !important;
+  border-color: var(--badge-color) !important;
+  color: var(--bc) !important;
+}
+
+.badge-brand:hover {
+  background-color: var(--badge-color) !important;
+  border-color: var(--badge-color) !important;
+  opacity: 0.9;
 }
