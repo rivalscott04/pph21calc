@@ -4,6 +4,7 @@
 	import { auth } from '$lib/stores/auth.js';
 	import { authApi } from '$lib/api/auth.js';
 	import { toast } from '$lib/stores/toast.js';
+	import { initBrandTheme } from '$lib/stores/brand.js';
 	
 	let email = '';
 	let password = '';
@@ -12,6 +13,11 @@
 	let formError = '';
 	
 	onMount(() => {
+		// Load brand colors immediately on login page
+		initBrandTheme().catch((error) => {
+			console.error('Failed to load brand theme:', error);
+		});
+		
 		// Don't auto-redirect on login page
 		// User should explicitly login even if there's stored token
 		// Token will be verified when accessing protected routes
@@ -85,7 +91,7 @@
 						<input
 							type="email"
 							class="input input-bordered border-base-300 focus:border-primary focus:ring-2 focus:ring-primary/20 w-full text-base-content placeholder:text-base-content/40"
-							placeholder="admin@test.local"
+							placeholder="admin@tes.com"
 							bind:value={email}
 							required
 						/>
@@ -131,7 +137,7 @@
 					{/if}
 					
 					<button
-						class="btn btn-success btn-lg w-full text-base font-semibold text-white mt-2 disabled:bg-success/70 disabled:text-white disabled:border-success/70 disabled:opacity-80"
+						class="btn btn-brand btn-lg w-full text-base font-semibold text-white mt-2 disabled:opacity-70"
 						type="submit"
 						disabled={loading}
 					>
@@ -148,20 +154,20 @@
 					<div class="divider text-base-content/60 text-sm uppercase tracking-[0.3em]">Akses cepat</div>
 					<div class="grid sm:grid-cols-2 gap-3">
 						<button
-							class="btn btn-success btn-sm sm:btn-md font-semibold text-white"
+							class="btn btn-brand btn-sm sm:btn-md font-semibold text-white"
 							type="button"
 							on:click={() => {
-								email = 'admin@test.local';
+								email = 'admin@tes.com';
 								password = 'password';
 							}}
 						>
 							Superadmin Demo
 						</button>
 						<button
-							class="btn btn-success btn-sm sm:btn-md font-semibold text-white"
+							class="btn btn-brand btn-sm sm:btn-md font-semibold text-white"
 							type="button"
 							on:click={() => {
-								email = 'tenant_admin@test.local';
+								email = 'ntbs@mail.com';
 								password = 'password';
 							}}
 						>

@@ -1,13 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { calculatorApi, type EmployeeSearchResult, type BatchCalculationItem, type BatchCalculationResponse, type CalculatorResponse, type CalculationHistory } from '$lib/api/calculator.js';
+	import { componentsApi, type Component } from '$lib/api/components.js';
+	import { deductionComponentsApi, type DeductionComponent } from '$lib/api/deductionComponents.js';
 	import { toast } from '$lib/stores/toast.js';
 
 	let loading = false;
 	let loadingEmployees = false;
 	let savingHistory = false;
+	let loadingComponents = false;
+	let loadingDeductionComponents = false;
 	let searchQuery = '';
 	let employees: EmployeeSearchResult[] = [];
+	let components: Component[] = [];
+	let deductionComponents: DeductionComponent[] = [];
 	let pagination = {
 		current_page: 1,
 		last_page: 1,
@@ -17,6 +23,8 @@
 	let selectedEmployeeIds: Set<number> = new Set();
 	let selectedEmployees: Map<number, EmployeeSearchResult & { 
 		calcData: BatchCalculationItem;
+		earnings: Map<number, number>; // component_id -> amount
+		deductions: Map<number, number>; // deduction_component_id -> amount
 		preview?: CalculatorResponse;
 		previewLoading?: boolean;
 		formattedValues?: {
@@ -191,8 +199,18 @@
 				}
 			}
 		} else {
-			// Untuk bruto, langsung update dan trigger auto-calculate
-			updateEmployeeCalc(employmentId, field, numValue);
+			// Untuk field lain (biaya_jabatan, iuran_pensiun, zakat), update langsung
+			const employee = selectedEmployees.get(employmentId);
+			if (employee) {
+				employee.calcData[field] = numValue;
+				if (employee.formattedValues) {
+					employee.formattedValues[field as keyof typeof employee.formattedValues] = formatted;
+				}
+				selectedEmployees = new Map(selectedEmployees);
+				if (numValue > 0) {
+					debouncedPreview(employmentId);
+				}
+			}
 		}
 	}
 
@@ -270,6 +288,44 @@
 		}
 	}
 
+	async function loadComponents() {
+		loadingComponents = true;
+		try {
+			const response = await componentsApi.list({ 
+				per_page: 1000 
+			});
+			// Filter only active components
+			components = (response.data || []).filter(c => c.is_active !== false);
+			// Sort by priority (smaller number = higher priority)
+			components.sort((a, b) => (a.priority || 0) - (b.priority || 0));
+		} catch (error: any) {
+			console.error('Failed to load components:', error);
+			toast.error('Gagal memuat daftar komponen earning');
+			components = [];
+		} finally {
+			loadingComponents = false;
+		}
+	}
+
+	async function loadDeductionComponents() {
+		loadingDeductionComponents = true;
+		try {
+			const response = await deductionComponentsApi.list({ 
+				is_active: true,
+				per_page: 1000 
+			});
+			deductionComponents = response.data || [];
+			// Sort by priority (smaller number = higher priority)
+			deductionComponents.sort((a, b) => (a.priority || 0) - (b.priority || 0));
+		} catch (error: any) {
+			console.error('Failed to load deduction components:', error);
+			toast.error('Gagal memuat daftar komponen deduction');
+			deductionComponents = [];
+		} finally {
+			loadingDeductionComponents = false;
+		}
+	}
+
 	function toggleEmployeeSelection(employee: EmployeeSearchResult) {
 		if (selectedEmployeeIds.has(employee.id)) {
 			selectedEmployeeIds.delete(employee.id);
@@ -285,6 +341,8 @@
 					iuran_pensiun: undefined,
 					zakat: 0
 				},
+				earnings: new Map<number, number>(), // component_id -> amount
+				deductions: new Map<number, number>(), // deduction_component_id -> amount
 				formattedValues: {
 					bruto: '',
 					biaya_jabatan: '',
@@ -310,23 +368,79 @@
 		}
 	}
 
-	function updateEmployeeCalc(employmentId: number, field: keyof BatchCalculationItem, value: any) {
+	// Calculate total bruto from taxable earnings
+	function calculateBruto(employmentId: number): number {
+		const employee = selectedEmployees.get(employmentId);
+		if (!employee || !employee.earnings) return 0;
+		
+		let total = 0;
+		employee.earnings.forEach((amount, componentId) => {
+			const component = components.find(c => c.id === componentId);
+			if (component && component.taxable) {
+				total += amount || 0;
+			}
+		});
+		return total;
+	}
+
+	// Handle earning input per component
+	function handleEarningInput(employmentId: number, componentId: number, event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		let value = input.value;
+		
+		// Save cursor position
+		const cursorPos = input.selectionStart || 0;
+		
+		// Remove all non-digit characters
+		const digitsOnly = value.replace(/\D/g, '');
+		
+		// Parse to number
+		const numValue = digitsOnly ? parseFormattedNumber(digitsOnly) : 0;
+		
+		// Format with thousand separators
+		const formatted = digitsOnly ? formatNumber(digitsOnly) : '';
+		
+		// Update input display value immediately (real-time)
+		input.value = formatted;
+		
+		// Calculate new cursor position (adjust for added dots)
+		const digitsBeforeCursor = value.substring(0, cursorPos).replace(/\D/g, '').length;
+		const newDotsBeforeCursor = Math.floor((digitsBeforeCursor - 1) / 3);
+		const newCursorPos = Math.max(0, Math.min(formatted.length, digitsBeforeCursor + newDotsBeforeCursor));
+		input.setSelectionRange(newCursorPos, newCursorPos);
+		
+		// Update earnings map
 		const employee = selectedEmployees.get(employmentId);
 		if (employee) {
-			employee.calcData[field] = value;
+			if (!employee.earnings) {
+				employee.earnings = new Map<number, number>();
+			}
+			if (numValue > 0) {
+				employee.earnings.set(componentId, numValue);
+			} else {
+				employee.earnings.delete(componentId);
+			}
 			
-			// Auto-calculate biaya jabatan dan iuran pensiun saat bruto diubah
-			if (field === 'bruto') {
-				// Ensure formattedValues exists
-				if (!employee.formattedValues) {
-					employee.formattedValues = {
-						bruto: '',
-						biaya_jabatan: '',
-						iuran_pensiun: '',
-						zakat: ''
-					};
-				}
-				
+			// Update bruto automatically from taxable earnings
+			const bruto = calculateBruto(employmentId);
+			employee.calcData.bruto = bruto;
+			
+			// Update formatted bruto
+			if (!employee.formattedValues) {
+				employee.formattedValues = {
+					bruto: '',
+					biaya_jabatan: '',
+					iuran_pensiun: '',
+					zakat: ''
+				};
+			}
+			employee.formattedValues.bruto = formatNumber(bruto);
+			
+			// Force reactivity
+			selectedEmployees = new Map(selectedEmployees);
+			
+			// Auto-calculate deduction components dengan calculation_type === 'auto' ATAU iuran_pensiun (selalu auto)
+			if (bruto > 0) {
 				// Ensure isManualInput exists
 				if (!employee.isManualInput) {
 					employee.isManualInput = {
@@ -335,55 +449,217 @@
 					};
 				}
 				
-				// Update formatted bruto
-				employee.formattedValues.bruto = formatNumber(value);
-				
-				// SELALU auto-calculate biaya jabatan jika belum diisi manual (hanya jika bruto > 0)
-				if (value > 0) {
-					// Auto-calculate jika bukan manual input
-					if (!employee.isManualInput.biaya_jabatan) {
-						// Use appropriate limit based on calculation mode
-						const biayaJabatanLimit = calculationMode === 'monthly' ? 500000 : 6000000;
-						const biayaJabatan = Math.min(value * 0.05, biayaJabatanLimit);
-						employee.calcData.biaya_jabatan = biayaJabatan;
-						// Update formatted value
-						employee.formattedValues.biaya_jabatan = formatNumber(biayaJabatan);
-					}
-					
-					// SELALU auto-calculate iuran pensiun jika belum diisi manual
-					if (!employee.isManualInput.iuran_pensiun) {
-						// Use appropriate limit based on calculation mode
-						const iuranPensiunLimit = calculationMode === 'monthly' ? 200000 : 2400000;
-						const iuranPensiun = Math.min(value * 0.05, iuranPensiunLimit);
-						employee.calcData.iuran_pensiun = iuranPensiun;
-						// Update formatted value
-						employee.formattedValues.iuran_pensiun = formatNumber(iuranPensiun);
-					}
-				} else if (value === 0) {
-					// Reset jika bruto = 0 (hanya jika bukan manual input)
-					if (!employee.isManualInput.biaya_jabatan) {
-						employee.calcData.biaya_jabatan = undefined;
-						employee.formattedValues.biaya_jabatan = '';
-					}
-					if (!employee.isManualInput.iuran_pensiun) {
-						employee.calcData.iuran_pensiun = undefined;
-						employee.formattedValues.iuran_pensiun = '';
-					}
-				}
-				
-				// Trigger reactivity dengan force update
-				selectedEmployees.set(employmentId, employee);
-				selectedEmployees = new Map(selectedEmployees);
-				
-				// Trigger preview dengan debounce
-				if (value > 0) {
-					debouncedPreview(employmentId);
-				}
+				// Loop through deduction components dengan calculation_type === 'auto' ATAU iuran_pensiun (selalu auto)
+				deductionComponents
+					.filter(dc => dc.calculation_type === 'auto' || isIuranPensiun(dc))
+					.forEach(deductionComponent => {
+						let calculatedAmount = 0;
+						
+						// Calculate based on component type
+						if (isBiayaJabatan(deductionComponent)) {
+							// Biaya Jabatan: 5% dari bruto, max 500rb/bulan atau 6jt/tahun
+							const limit = calculationMode === 'monthly' ? 500000 : 6000000;
+							calculatedAmount = Math.min(bruto * 0.05, limit);
+							
+							// Update calcData untuk backward compatibility
+							if (employee.isManualInput && !employee.isManualInput.biaya_jabatan) {
+								employee.calcData.biaya_jabatan = calculatedAmount;
+								if (employee.formattedValues) {
+									employee.formattedValues.biaya_jabatan = formatNumber(calculatedAmount);
+								}
+							}
+						} else if (isIuranPensiun(deductionComponent)) {
+							// Iuran Pensiun: 5% dari bruto, max 200rb/bulan atau 2.4jt/tahun
+							const limit = calculationMode === 'monthly' ? 200000 : 2400000;
+							calculatedAmount = Math.min(bruto * 0.05, limit);
+							
+							// Update calcData untuk backward compatibility
+							if (employee.isManualInput && !employee.isManualInput.iuran_pensiun) {
+								employee.calcData.iuran_pensiun = calculatedAmount;
+								if (employee.formattedValues) {
+									employee.formattedValues.iuran_pensiun = formatNumber(calculatedAmount);
+								}
+							}
+						} else {
+							// Komponen auto lainnya (jika ada) - bisa dikembangkan sesuai kebutuhan
+							// Untuk sekarang, skip komponen auto selain biaya_jabatan dan iuran_pensiun
+						}
+						
+						// Update deductions map
+						if (!employee.deductions) {
+							employee.deductions = new Map<number, number>();
+						}
+						if (calculatedAmount > 0) {
+							employee.deductions.set(deductionComponent.id, calculatedAmount);
+						}
+					});
 			} else {
-				selectedEmployees.set(employmentId, employee);
-				selectedEmployees = new Map(selectedEmployees);
+				// Reset jika bruto = 0 (hanya jika bukan manual input)
+				if (!employee.isManualInput) {
+					employee.isManualInput = {
+						biaya_jabatan: false,
+						iuran_pensiun: false
+					};
+				}
+				
+				// Reset auto-calculated deductions (termasuk iuran_pensiun yang selalu auto)
+				deductionComponents
+					.filter(dc => dc.calculation_type === 'auto' || isIuranPensiun(dc))
+					.forEach(deductionComponent => {
+						if (isBiayaJabatan(deductionComponent) && employee.isManualInput && !employee.isManualInput.biaya_jabatan) {
+							employee.calcData.biaya_jabatan = undefined;
+							if (employee.formattedValues) {
+								employee.formattedValues.biaya_jabatan = '';
+							}
+							if (employee.deductions) {
+								employee.deductions.delete(deductionComponent.id);
+							}
+						} else if (isIuranPensiun(deductionComponent) && employee.isManualInput && !employee.isManualInput.iuran_pensiun) {
+							employee.calcData.iuran_pensiun = undefined;
+							if (employee.formattedValues) {
+								employee.formattedValues.iuran_pensiun = '';
+							}
+							if (employee.deductions) {
+								employee.deductions.delete(deductionComponent.id);
+							}
+						}
+					});
+			}
+			
+			// Trigger preview dengan debounce
+			if (bruto > 0) {
+				debouncedPreview(employmentId);
 			}
 		}
+	}
+
+	// Get earning amount for a specific component
+	function getEarningAmount(employmentId: number, componentId: number): string {
+		const employee = selectedEmployees.get(employmentId);
+		if (!employee || !employee.earnings) return '';
+		const amount = employee.earnings.get(componentId) || 0;
+		return amount > 0 ? formatNumber(amount) : '';
+	}
+
+	// Helper: Check if deduction component is biaya_jabatan
+	function isBiayaJabatan(component: DeductionComponent): boolean {
+		return component.code === 'biaya_jabatan' || 
+		       (component.calculation_type === 'auto' && 
+		        component.name.toLowerCase().includes('biaya jabatan'));
+	}
+
+	// Helper: Check if deduction component is iuran_pensiun
+	// Iuran Pensiun SELALU auto-calculate sesuai aturan: 5% dari bruto, max 200rb/bulan atau 2.4jt/tahun
+	function isIuranPensiun(component: DeductionComponent): boolean {
+		return component.code === 'iuran_pensiun' || 
+		       component.name.toLowerCase().includes('iuran pensiun');
+	}
+
+	// Helper: Check if deduction component is zakat
+	function isZakat(component: DeductionComponent): boolean {
+		return component.code === 'zakat' || 
+		       component.name.toLowerCase().includes('zakat');
+	}
+
+	// Handle deduction input per component
+	function handleDeductionInput(employmentId: number, deductionComponentId: number, event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		let value = input.value;
+		
+		// Save cursor position
+		const cursorPos = input.selectionStart || 0;
+		
+		// Remove all non-digit characters
+		const digitsOnly = value.replace(/\D/g, '');
+		
+		// Parse to number
+		const numValue = digitsOnly ? parseFormattedNumber(digitsOnly) : 0;
+		
+		// Format with thousand separators
+		const formatted = digitsOnly ? formatNumber(digitsOnly) : '';
+		
+		// Update input display value immediately (real-time)
+		input.value = formatted;
+		
+		// Calculate new cursor position (adjust for added dots)
+		const digitsBeforeCursor = value.substring(0, cursorPos).replace(/\D/g, '').length;
+		const newDotsBeforeCursor = Math.floor((digitsBeforeCursor - 1) / 3);
+		const newCursorPos = Math.max(0, Math.min(formatted.length, digitsBeforeCursor + newDotsBeforeCursor));
+		input.setSelectionRange(newCursorPos, newCursorPos);
+		
+		// Update deductions map
+		const employee = selectedEmployees.get(employmentId);
+		const deductionComponent = deductionComponents.find(dc => dc.id === deductionComponentId);
+		
+		if (employee && deductionComponent) {
+			if (!employee.deductions) {
+				employee.deductions = new Map<number, number>();
+			}
+			if (numValue > 0) {
+				employee.deductions.set(deductionComponentId, numValue);
+			} else {
+				employee.deductions.delete(deductionComponentId);
+			}
+			
+			// Update calcData untuk komponen khusus (biaya_jabatan, iuran_pensiun, zakat)
+			if (isBiayaJabatan(deductionComponent)) {
+				employee.calcData.biaya_jabatan = numValue > 0 ? numValue : undefined;
+				if (!employee.isManualInput) {
+					employee.isManualInput = { biaya_jabatan: false, iuran_pensiun: false };
+				}
+				employee.isManualInput.biaya_jabatan = numValue > 0;
+				if (employee.formattedValues) {
+					employee.formattedValues.biaya_jabatan = formatted;
+				}
+			} else if (isIuranPensiun(deductionComponent)) {
+				employee.calcData.iuran_pensiun = numValue > 0 ? numValue : undefined;
+				if (!employee.isManualInput) {
+					employee.isManualInput = { biaya_jabatan: false, iuran_pensiun: false };
+				}
+				employee.isManualInput.iuran_pensiun = numValue > 0;
+				if (employee.formattedValues) {
+					employee.formattedValues.iuran_pensiun = formatted;
+				}
+			} else if (isZakat(deductionComponent)) {
+				employee.calcData.zakat = numValue;
+				if (employee.formattedValues) {
+					employee.formattedValues.zakat = formatted;
+				}
+			}
+			
+			// Force reactivity
+			selectedEmployees = new Map(selectedEmployees);
+			
+			// Trigger preview dengan debounce
+			if (employee.calcData.bruto > 0) {
+				debouncedPreview(employmentId);
+			}
+		}
+	}
+
+	// Get deduction amount for a specific component
+	function getDeductionAmount(employmentId: number, deductionComponentId: number): string {
+		const employee = selectedEmployees.get(employmentId);
+		if (!employee || !employee.deductions) return '';
+		const amount = employee.deductions.get(deductionComponentId) || 0;
+		return amount > 0 ? formatNumber(amount) : '';
+	}
+
+	// Get deduction amount from calcData (for backward compatibility with biaya_jabatan, iuran_pensiun, zakat)
+	function getDeductionAmountFromCalcData(employmentId: number, deductionComponent: DeductionComponent): string {
+		const employee = selectedEmployees.get(employmentId);
+		if (!employee) return '';
+		
+		if (isBiayaJabatan(deductionComponent)) {
+			return employee.formattedValues?.biaya_jabatan || '';
+		} else if (isIuranPensiun(deductionComponent)) {
+			return employee.formattedValues?.iuran_pensiun || '';
+		} else if (isZakat(deductionComponent)) {
+			return employee.formattedValues?.zakat || '';
+		}
+		
+		// Fallback to deductions map
+		return getDeductionAmount(employmentId, deductionComponent.id);
 	}
 
 	let previewTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
@@ -421,15 +697,13 @@
 				zakatValue = 0;
 			}
 			
-			// Convert bruto based on calculation mode
-			// If monthly mode: bruto is monthly, need to multiply by 12 for annual
-			// If yearly mode: bruto is already annual
-			let annualBruto = employee.calcData.bruto;
+			// Calculate bruto dari taxable earnings (menggunakan format baru)
+			let annualBruto = calculateBruto(employmentId);
 			if (calculationMode === 'monthly') {
-				annualBruto = employee.calcData.bruto * 12;
+				annualBruto = annualBruto * 12;
 			}
 			
-			// Convert biaya_jabatan and iuran_pensiun if needed
+			// Get biaya_jabatan dan iuran_pensiun dari calcData (untuk backward compatibility)
 			let annualBiayaJabatan = employee.calcData.biaya_jabatan;
 			let annualIuranPensiun = employee.calcData.iuran_pensiun;
 			
@@ -443,29 +717,64 @@
 				}
 			}
 			
-			// Zakat is always annual in the calculation
-			let annualZakat = zakatValue;
+			// Get zakat dari calcData atau deductions map
+			let annualZakat = employee.calcData.zakat ?? 0;
+			if (annualZakat === 0 && employee.deductions) {
+				// Cari zakat dari deductions map
+				const zakatComponent = deductionComponents.find(dc => isZakat(dc));
+				if (zakatComponent) {
+					annualZakat = employee.deductions.get(zakatComponent.id) || 0;
+				}
+			}
 			if (calculationMode === 'monthly') {
 				annualZakat = annualZakat * 12;
 			}
+			if (!annualZakat || isNaN(annualZakat) || annualZakat < 0) {
+				annualZakat = 0;
+			}
 			
-			// Prepare request payload - only include zakat if > 0, or send 0 explicitly
+			// Build earnings array (untuk format baru - siap untuk backend update)
+			const earningsArray: Array<{ component_id: number; amount: number }> = [];
+			if (employee.earnings) {
+				employee.earnings.forEach((amount, componentId) => {
+					if (amount > 0) {
+						let annualAmount = amount;
+						if (calculationMode === 'monthly') {
+							annualAmount = amount * 12;
+						}
+						earningsArray.push({
+							component_id: componentId,
+							amount: annualAmount
+						});
+					}
+				});
+			}
+			
+			// Build deductions array (untuk format baru - siap untuk backend update)
+			const deductionsArray: Array<{ deduction_component_id: number; amount: number }> = [];
+			if (employee.deductions) {
+				employee.deductions.forEach((amount, deductionComponentId) => {
+					if (amount > 0) {
+						let annualAmount = amount;
+						if (calculationMode === 'monthly') {
+							annualAmount = amount * 12;
+						}
+						deductionsArray.push({
+							deduction_component_id: deductionComponentId,
+							amount: annualAmount
+						});
+					}
+				});
+			}
+			
+			// Prepare request payload - menggunakan format baru (earnings, deductions)
 			const requestPayload: any = {
 				ptkp_code: employee.ptkp_code,
-				bruto: annualBruto,
+				earnings: earningsArray,
+				deductions: deductionsArray,
 				month: month,
 				has_npwp: employee.has_npwp
 			};
-			
-			// Only include optional fields if they have values
-			if (annualBiayaJabatan !== undefined && annualBiayaJabatan !== null) {
-				requestPayload.biaya_jabatan = annualBiayaJabatan;
-			}
-			if (annualIuranPensiun !== undefined && annualIuranPensiun !== null) {
-				requestPayload.iuran_pensiun = annualIuranPensiun;
-			}
-			// Always send zakat (even if 0) to be explicit
-			requestPayload.zakat = annualZakat;
 			
 			const result = await calculatorApi.calculatePPh21(requestPayload);
 			employee.preview = result;
@@ -528,44 +837,87 @@
 		batchResult = null;
 
 		try {
-			// Convert calculations based on mode
+			// Convert calculations based on mode - menggunakan format baru dengan earnings dan deductions array
 			const calculations: BatchCalculationItem[] = Array.from(selectedEmployees.values()).map(
 				(emp) => {
-					let bruto = emp.calcData.bruto;
-					let biayaJabatan = emp.calcData.biaya_jabatan;
-					let iuranPensiun = emp.calcData.iuran_pensiun;
-					// Ensure zakat is a number (0 if empty/null/undefined)
-					let zakat: number = emp.calcData.zakat ?? 0;
-					// Ensure it's a valid number (not NaN, not negative)
-					if (!zakat || isNaN(zakat) || zakat < 0) {
-						zakat = 0;
+					// Build earnings array dari komponen earning
+					const earningsArray: Array<{ component_id: number; amount: number }> = [];
+					if (emp.earnings) {
+						emp.earnings.forEach((amount, componentId) => {
+							if (amount > 0) {
+								// Convert to annual if monthly mode
+								let annualAmount = amount;
+								if (calculationMode === 'monthly') {
+									annualAmount = amount * 12;
+								}
+								earningsArray.push({
+									component_id: componentId,
+									amount: annualAmount
+								});
+							}
+						});
 					}
 					
-					// If monthly mode, convert to annual
+					// Build deductions array dari komponen deduction
+					const deductionsArray: Array<{ deduction_component_id: number; amount: number }> = [];
+					if (emp.deductions) {
+						emp.deductions.forEach((amount, deductionComponentId) => {
+							if (amount > 0) {
+								// Convert to annual if monthly mode
+								let annualAmount = amount;
+								if (calculationMode === 'monthly') {
+									annualAmount = amount * 12;
+								}
+								deductionsArray.push({
+									deduction_component_id: deductionComponentId,
+									amount: annualAmount
+								});
+							}
+						});
+					}
+					
+					// Calculate bruto dari taxable earnings (untuk backward compatibility dengan backend)
+					let bruto = calculateBruto(emp.id);
 					if (calculationMode === 'monthly') {
 						bruto = bruto * 12;
+					}
+					
+					// Get biaya_jabatan dan iuran_pensiun dari calcData (untuk backward compatibility)
+					let biayaJabatan = emp.calcData.biaya_jabatan;
+					let iuranPensiun = emp.calcData.iuran_pensiun;
+					if (calculationMode === 'monthly') {
 						if (biayaJabatan !== undefined) {
 							biayaJabatan = biayaJabatan * 12;
 						}
 						if (iuranPensiun !== undefined) {
 							iuranPensiun = iuranPensiun * 12;
 						}
+					}
+					
+					// Get zakat dari calcData atau deductions
+					let zakat: number = emp.calcData.zakat ?? 0;
+					if (zakat === 0 && emp.deductions) {
+						// Cari zakat dari deductions map
+						const zakatComponent = deductionComponents.find(dc => isZakat(dc));
+						if (zakatComponent) {
+							const zakatAmount = emp.deductions.get(zakatComponent.id) || 0;
+							zakat = zakatAmount;
+						}
+					}
+					if (calculationMode === 'monthly') {
 						zakat = zakat * 12;
 					}
+					if (!zakat || isNaN(zakat) || zakat < 0) {
+						zakat = 0;
+					}
 					
-					// Build calculation item - only include optional fields if they have values
-					const calcItem: BatchCalculationItem = {
+					// Build calculation item - menggunakan format baru (earnings, deductions)
+					// @ts-ignore - temporary untuk format baru
+					const calcItem: any = {
 						employment_id: emp.calcData.employment_id,
-						bruto,
-						zakat // Always include zakat (even if 0)
+						earnings: earningsArray,
+						deductions: deductionsArray
 					};
-					
-					if (biayaJabatan !== undefined && biayaJabatan !== null) {
-						calcItem.biaya_jabatan = biayaJabatan;
-					}
-					if (iuranPensiun !== undefined && iuranPensiun !== null) {
-						calcItem.iuran_pensiun = iuranPensiun;
-					}
 					
 					return calcItem;
 				}
@@ -745,8 +1097,12 @@
 		previousCalculationMode = calculationMode;
 	}
 
-	onMount(() => {
-		loadEmployees();
+	onMount(async () => {
+		await Promise.all([
+			loadEmployees(),
+			loadComponents(),
+			loadDeductionComponents()
+		]);
 	});
 </script>
 
@@ -1097,10 +1453,6 @@
 			<!-- Calculation Forms (Natural Scroll) -->
 			<div class="space-y-4">
 				{#each Array.from(selectedEmployees.values()) as employee}
-					{@const formattedBruto = getFormattedInputValue(employee.id, 'bruto')}
-					{@const formattedBiayaJabatan = getFormattedInputValue(employee.id, 'biaya_jabatan')}
-					{@const formattedIuranPensiun = getFormattedInputValue(employee.id, 'iuran_pensiun')}
-					{@const formattedZakat = getFormattedInputValue(employee.id, 'zakat')}
 					<div class="card bg-base-100 shadow-lg">
 						<div class="card-body">
 							<div class="flex justify-between items-start mb-4">
@@ -1114,130 +1466,199 @@
 									<span class="badge badge-success">Terhitung</span>
 								{/if}
 							</div>
-							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-								<!-- Bruto -->
-								<div class="form-control md:col-span-2">
-									<label for="bruto-{employee.id}" class="label">
+							<div class="space-y-4">
+								<!-- Earnings per Component -->
+								<div class="form-control">
+									<div class="label">
 										<span class="label-text font-semibold text-base-content">
-											Penghasilan Bruto <span class="text-error">*</span>
+											Penghasilan (Earnings) <span class="text-error">*</span>
 											{#if calculationMode === 'monthly'}
 												<span class="badge badge-sm badge-info ml-2">Bulanan</span>
 											{:else}
 												<span class="badge badge-sm badge-warning ml-2">Tahunan</span>
 											{/if}
 										</span>
-									</label>
-									<label class="input input-bordered w-full text-base-content text-lg flex items-center gap-2">
-										<span class="text-base-content opacity-70">Rp</span>
-										<input
-											id="bruto-{employee.id}"
-											type="text"
-											class="grow text-base-content"
-											placeholder="0"
-											value={formattedBruto}
-											on:input={(e) => handleCurrencyInput(employee.id, 'bruto', e)}
-										/>
-									</label>
-									<div class="label">
-										<span class="label-text-alt text-base-content opacity-60">
-											{#if calculationMode === 'monthly'}
-												Total penghasilan bulanan sebelum potongan (akan dikonversi ×12)
-											{:else}
-												Total penghasilan tahunan sebelum potongan
-											{/if}
-										</span>
 									</div>
+									{#if components.length === 0}
+										<div class="alert alert-warning">
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+											</svg>
+											<span>Belum ada komponen earnings. Silakan buat komponen terlebih dahulu di menu Master Data.</span>
+										</div>
+									{:else}
+										<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+											{#each components as component}
+												<div class="form-control">
+													<label for="earning-{employee.id}-{component.id}" class="label">
+														<span class="label-text text-base-content">
+															{component.name}
+															{#if component.is_mandatory}
+																<span class="badge badge-xs badge-error ml-1" title="Komponen wajib diisi">Wajib</span>
+															{/if}
+															{#if component.taxable}
+																<span class="badge badge-xs badge-success ml-1" title="Komponen ini termasuk dalam perhitungan bruto (taxable)">Taxable</span>
+															{:else}
+																<span class="badge badge-xs badge-neutral ml-1" title="Komponen ini tidak termasuk dalam perhitungan bruto (non-taxable)">Non-Taxable</span>
+															{/if}
+														</span>
+													</label>
+													<label class="input input-bordered w-full text-base-content flex items-center gap-2 {component.taxable ? 'border-success/30 bg-success/5' : ''}">
+														<span class="text-base-content opacity-70">Rp</span>
+														<input
+															id="earning-{employee.id}-{component.id}"
+															type="text"
+															class="grow text-base-content"
+															placeholder="0"
+															value={getEarningAmount(employee.id, component.id)}
+															on:input={(e) => handleEarningInput(employee.id, component.id, e)}
+														/>
+													</label>
+													{#if component.taxable}
+														<div class="label">
+															<span class="label-text-alt text-success opacity-70">
+																✓ Termasuk dalam perhitungan bruto
+															</span>
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
+										<!-- Total Bruto (Auto-calculated) -->
+										<div class="form-control mt-4">
+											<div class="label">
+												<span class="label-text font-semibold text-base-content">
+													Total Bruto (Otomatis)
+													{#if calculationMode === 'monthly'}
+														<span class="badge badge-sm badge-info ml-2">Bulanan</span>
+													{:else}
+														<span class="badge badge-sm badge-warning ml-2">Tahunan</span>
+													{/if}
+												</span>
+											</div>
+											<label class="input input-bordered w-full text-base-content text-lg flex items-center gap-2 bg-base-200">
+												<span class="text-base-content opacity-70">Rp</span>
+												<input
+													type="text"
+													class="grow text-base-content"
+													value={formatNumber(calculateBruto(employee.id))}
+													readonly
+													disabled
+												/>
+											</label>
+											<div class="label">
+												<span class="label-text-alt text-base-content opacity-60">
+													Total dari komponen taxable (hanya komponen dengan taxable: true)
+													{#if calculationMode === 'monthly'}
+														• Akan dikonversi ×12 untuk perhitungan
+													{/if}
+												</span>
+											</div>
+										</div>
+									{/if}
 								</div>
-
-								<!-- Biaya Jabatan -->
-								<div class="form-control">
-									<label for="biaya-jabatan-{employee.id}" class="label">
-										<span class="label-text font-semibold text-base-content">Biaya Jabatan</span>
-									</label>
-									<label class="input input-bordered w-full text-base-content flex items-center gap-2">
-										<span class="text-base-content opacity-70">Rp</span>
-										<input
-											id="biaya-jabatan-{employee.id}"
-											type="text"
-											class="grow text-base-content"
-											placeholder={calculationMode === 'monthly' ? 'Otomatis (5%, max 500rb/bulan)' : 'Otomatis (5%, max 6jt/tahun)'}
-											value={formattedBiayaJabatan}
-											on:input={(e) => handleCurrencyInput(employee.id, 'biaya_jabatan', e)}
-										/>
-									</label>
-									<div class="label">
-										<span class="label-text-alt text-base-content opacity-60">
-											Kosongkan untuk perhitungan otomatis
-											{#if calculationMode === 'monthly'}
-												(5%, max 500rb/bulan)
-											{:else}
-												(5%, max 6jt/tahun)
-											{/if}
-										</span>
+							</div>
+							
+							<!-- Deductions per Component -->
+							<div class="form-control mt-4">
+								<div class="label">
+									<span class="label-text font-semibold text-base-content">
+										Pengurang (Deductions)
+										{#if calculationMode === 'monthly'}
+											<span class="badge badge-sm badge-info ml-2">Bulanan</span>
+										{:else}
+											<span class="badge badge-sm badge-warning ml-2">Tahunan</span>
+										{/if}
+									</span>
+								</div>
+								
+								<!-- Info untuk komponen auto-calculate -->
+								<!-- Termasuk komponen dengan calculation_type === 'auto' DAN iuran_pensiun (selalu auto) -->
+								{#if deductionComponents.filter(dc => dc.calculation_type === 'auto' || isIuranPensiun(dc)).length > 0}
+									{@const autoDeductionComponents = deductionComponents.filter(dc => 
+										dc.calculation_type === 'auto' || isIuranPensiun(dc)
+									)}
+									<div class="alert alert-info mb-4 py-2">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+										</svg>
+										<div class="text-xs">
+											<strong>Komponen Auto-calculate (tidak perlu input):</strong>
+											<div class="flex flex-wrap gap-1 mt-1">
+												{#each autoDeductionComponents as autoComponent}
+													<div class="tooltip tooltip-top" data-tip="Komponen ini dihitung otomatis berdasarkan bruto. Biaya Jabatan: 5% dari bruto (maks 6 juta/tahun). Iuran Pensiun: 5% dari bruto (maks 2,4 juta/tahun).">
+														<span class="badge badge-sm badge-info cursor-help">{autoComponent.name}</span>
+													</div>
+												{/each}
+											</div>
+											<span class="block mt-1">Komponen ini akan dihitung otomatis oleh sistem berdasarkan bruto. Hover pada badge untuk detail perhitungan.</span>
+										</div>
 									</div>
-								</div>
-
-								<!-- Iuran Pensiun -->
-								<div class="form-control">
-									<label for="iuran-pensiun-{employee.id}" class="label">
-										<span class="label-text font-semibold text-base-content">Iuran Pensiun</span>
-									</label>
-									<label class="input input-bordered w-full text-base-content flex items-center gap-2">
-										<span class="text-base-content opacity-70">Rp</span>
-										<input
-											id="iuran-pensiun-{employee.id}"
-											type="text"
-											class="grow text-base-content"
-											placeholder={calculationMode === 'monthly' ? 'Otomatis (5%, max 200rb/bulan)' : 'Otomatis (5%, max 2.4jt/tahun)'}
-											value={formattedIuranPensiun}
-											on:input={(e) => handleCurrencyInput(employee.id, 'iuran_pensiun', e)}
-										/>
-									</label>
-									<div class="label">
-										<span class="label-text-alt text-base-content opacity-60">
-											Kosongkan untuk perhitungan otomatis
-											{#if calculationMode === 'monthly'}
-												(5%, max 200rb/bulan)
-											{:else}
-												(5%, max 2.4jt/tahun)
-											{/if}
-										</span>
+								{/if}
+								
+								<!-- Form input untuk komponen manual/percentage -->
+								<!-- Filter: hanya komponen yang calculation_type !== 'auto' DAN bukan iuran_pensiun (karena iuran pensiun SELALU auto) -->
+								{#if deductionComponents.filter(dc => dc.calculation_type !== 'auto' && !isIuranPensiun(dc)).length === 0}
+									{@const manualDeductionComponents: DeductionComponent[] = []}
+									<div class="alert alert-info">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+										</svg>
+										<span>Semua komponen deduction menggunakan perhitungan otomatis. Tidak perlu input manual.</span>
 									</div>
-								</div>
-
-								<!-- Zakat -->
-								<div class="form-control md:col-span-2">
-									<label for="zakat-{employee.id}" class="label">
-										<span class="label-text font-semibold text-base-content">
-											Zakat
-											{#if calculationMode === 'monthly'}
-												<span class="badge badge-sm badge-info ml-2">Bulanan</span>
-											{:else}
-												<span class="badge badge-sm badge-warning ml-2">Tahunan</span>
-											{/if}
-										</span>
-									</label>
-									<label class="input input-bordered w-full text-base-content flex items-center gap-2">
-										<span class="text-base-content opacity-70">Rp</span>
-										<input
-											id="zakat-{employee.id}"
-											type="text"
-											class="grow text-base-content"
-											placeholder="0"
-											value={formattedZakat}
-											on:input={(e) => handleCurrencyInput(employee.id, 'zakat', e)}
-										/>
-									</label>
-									<div class="label">
-										<span class="label-text-alt text-base-content opacity-60">
-											{#if calculationMode === 'monthly'}
-												Zakat bulanan (akan dikonversi ×12)
-											{:else}
-												Zakat tahunan
-											{/if}
-										</span>
+								{:else}
+									{@const manualDeductionComponents = deductionComponents.filter(dc => 
+										dc.calculation_type !== 'auto' && !isIuranPensiun(dc)
+									)}
+									<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{#each manualDeductionComponents as deductionComponent}
+											<div class="form-control">
+												<label for="deduction-{employee.id}-{deductionComponent.id}" class="label">
+													<span class="label-text text-base-content">
+														{deductionComponent.name}
+														{#if deductionComponent.type === 'mandatory'}
+															<span class="badge badge-xs badge-error ml-1" title="Komponen wajib diisi">Wajib</span>
+														{/if}
+														{#if deductionComponent.is_tax_deductible}
+															<span class="badge badge-xs badge-success ml-1" title="Komponen ini mengurangi penghasilan kena pajak (tax deductible)">Tax Deductible</span>
+														{:else}
+															<span class="badge badge-xs badge-neutral ml-1" title="Komponen ini tidak mengurangi penghasilan kena pajak (non-tax deductible)">Non-Tax Deductible</span>
+														{/if}
+														{#if deductionComponent.calculation_type === 'percentage'}
+															<span class="badge badge-xs badge-warning ml-1" title="Komponen ini dihitung berdasarkan persentase">Percentage</span>
+														{/if}
+													</span>
+												</label>
+												<label class="input input-bordered w-full text-base-content flex items-center gap-2 {deductionComponent.is_tax_deductible ? 'border-success/30 bg-success/5' : ''}">
+													<span class="text-base-content opacity-70">Rp</span>
+													<input
+														id="deduction-{employee.id}-{deductionComponent.id}"
+														type="text"
+														class="grow text-base-content"
+														placeholder="0"
+														value={getDeductionAmount(employee.id, deductionComponent.id)}
+														on:input={(e) => handleDeductionInput(employee.id, deductionComponent.id, e)}
+													/>
+												</label>
+												<div class="label">
+													<span class="label-text-alt text-base-content opacity-60">
+														{#if isZakat(deductionComponent)}
+															{#if calculationMode === 'monthly'}
+																Zakat bulanan (akan dikonversi ×12)
+															{:else}
+																Zakat tahunan
+															{/if}
+														{:else if deductionComponent.is_tax_deductible}
+															<span class="text-success">Mengurangi penghasilan kena pajak</span>
+														{:else}
+															Input manual untuk {deductionComponent.name}
+														{/if}
+													</span>
+												</div>
+											</div>
+										{/each}
 									</div>
-								</div>
+								{/if}
 							</div>
 
 							<!-- Quick Result Preview (Real-time) -->

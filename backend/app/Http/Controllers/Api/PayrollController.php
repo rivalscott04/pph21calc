@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Component;
+use App\Models\DeductionComponent;
 use App\Models\DeductionsManual;
 use App\Models\Earning;
 use App\Models\Employment;
@@ -135,6 +136,7 @@ class PayrollController extends Controller
                 'employment.person.identifiers.scheme',
                 'employment.orgUnit',
                 'period',
+                'deductionComponent',
             ])
             ->orderBy('created_at', 'desc');
 
@@ -166,7 +168,7 @@ class PayrollController extends Controller
             'period_id' => 'required|exists:periods,id',
             'deductions' => 'required|array',
             'deductions.*.employment_id' => 'required|exists:employments,id',
-            'deductions.*.type' => 'required|string|in:iuran_pensiun,zakat,lainnya',
+            'deductions.*.deduction_component_id' => 'required|exists:deduction_components,id',
             'deductions.*.amount' => 'required|numeric|min:0',
         ]);
 
@@ -199,11 +201,17 @@ class PayrollController extends Controller
                     continue;
                 }
 
-                // Check if deduction already exists (same period, employment, type)
+                // Verify deduction component belongs to tenant
+                $deductionComponent = DeductionComponent::findOrFail($deductionData['deduction_component_id']);
+                if ($deductionComponent->tenant_id != $tenantId) {
+                    continue;
+                }
+
+                // Check if deduction already exists (same period, employment, deduction_component)
                 $existing = DeductionsManual::where('tenant_id', $tenantId)
                     ->where('period_id', $validated['period_id'])
                     ->where('employment_id', $deductionData['employment_id'])
-                    ->where('type', $deductionData['type'])
+                    ->where('deduction_component_id', $deductionData['deduction_component_id'])
                     ->first();
 
                 if ($existing) {
@@ -216,7 +224,7 @@ class PayrollController extends Controller
                         'tenant_id' => $tenantId,
                         'employment_id' => $deductionData['employment_id'],
                         'period_id' => $validated['period_id'],
-                        'type' => $deductionData['type'],
+                        'deduction_component_id' => $deductionData['deduction_component_id'],
                         'amount' => $deductionData['amount'],
                     ]);
                     $created[] = $deduction;
@@ -236,7 +244,7 @@ class PayrollController extends Controller
      */
     public function preview(Request $request, $periodId)
     {
-        $period = Period::with(['earnings.component', 'deductions'])->findOrFail($periodId);
+        $period = Period::with(['earnings.component', 'deductions.deductionComponent'])->findOrFail($periodId);
         $tenantId = $request->input('tenant_id') 
             ?? (app()->bound('tenant_id') ? app('tenant_id') : null);
 
@@ -313,7 +321,7 @@ class PayrollController extends Controller
      */
     public function commit(Request $request, $periodId)
     {
-        $period = Period::with(['earnings.component', 'deductions'])->findOrFail($periodId);
+        $period = Period::with(['earnings.component', 'deductions.deductionComponent'])->findOrFail($periodId);
         $tenantId = $request->input('tenant_id') 
             ?? (app()->bound('tenant_id') ? app('tenant_id') : null);
 
@@ -478,7 +486,8 @@ class PayrollController extends Controller
             ->where('employment_id', $employmentId)
             ->get();
 
-        $deductions = DeductionsManual::where('period_id', $periodId)
+        $deductions = DeductionsManual::with('deductionComponent')
+            ->where('period_id', $periodId)
             ->where('employment_id', $employmentId)
             ->get();
 
@@ -501,7 +510,7 @@ class PayrollController extends Controller
             }),
             'deductions' => $deductions->map(function ($deduction) {
                 return [
-                    'type' => $deduction->type,
+                    'type' => $deduction->deductionComponent ? $deduction->deductionComponent->name : ($deduction->type ?? 'N/A'),
                     'amount' => $deduction->amount,
                 ];
             }),

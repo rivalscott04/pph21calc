@@ -87,20 +87,32 @@
 			return;
 		}
 
-		const targetTenantId = selectedTenantId || currentUser?.tenant?.id;
-		if (!targetTenantId) {
-			toast.error('Tenant tidak ditemukan');
-			return;
-		}
-
 		saving = true;
 		try {
-			await tenantsApi.createUser(targetTenantId, {
-				name: formData.name.trim(),
-				email: formData.email.trim().toLowerCase(),
-				password: formData.password,
-				role: formData.role
-			});
+			// If superadmin, use tenant-specific endpoint
+			if (isSuperadmin) {
+				const targetTenantId = selectedTenantId || currentUser?.tenant?.id;
+				if (!targetTenantId) {
+					toast.error('Tenant tidak ditemukan');
+					saving = false;
+					return;
+				}
+				await tenantsApi.createUser(targetTenantId, {
+					name: formData.name.trim(),
+					email: formData.email.trim().toLowerCase(),
+					password: formData.password,
+					role: formData.role
+				});
+			} else {
+				// If tenant admin, use my-tenant endpoint
+				await tenantsApi.createUserInMyTenant({
+					name: formData.name.trim(),
+					email: formData.email.trim().toLowerCase(),
+					password: formData.password,
+					role: formData.role,
+					status: formData.status
+				});
+			}
 			toast.success('User berhasil dibuat');
 			closeModal();
 			await loadUsers();
@@ -130,22 +142,31 @@
 	}
 
 	async function loadUsers() {
-		const targetTenantId = selectedTenantId || currentUser?.tenant?.id;
-		if (!targetTenantId) {
-			users = [];
-			loading = false;
-			return;
-		}
-
+		loading = true;
 		try {
-			const response: any = await tenantsApi.listUsers(targetTenantId);
+			let response: any;
+			
+			// If superadmin, use tenant-specific endpoint
+			if (isSuperadmin) {
+				const targetTenantId = selectedTenantId || currentUser?.tenant?.id;
+				if (!targetTenantId) {
+					users = [];
+					loading = false;
+					return;
+				}
+				response = await tenantsApi.listUsers(targetTenantId);
+			} else {
+				// If tenant admin, use my-tenant endpoint
+				response = await tenantsApi.listMyTenantUsers();
+			}
 			// Handle paginated response or direct array
 			if (Array.isArray(response)) {
 				users = response;
 			} else if (response?.data && Array.isArray(response.data)) {
 				users = response.data;
 			} else {
-				users = [];
+				// If response is paginated object, extract data
+				users = response?.data || [];
 			}
 		} catch (error) {
 			console.error('Failed to load users:', error);
@@ -196,9 +217,9 @@
 					<div class="label">
 						<span class="label-text font-semibold text-base-content">Pilih Tenant</span>
 					</div>
-					<select class="select select-bordered text-base-content" bind:value={selectedTenantId}>
+					<select class="select select-bordered text-neutral bg-base-100" bind:value={selectedTenantId}>
 						{#each tenants as tenant}
-							<option value={tenant.id}>{tenant.name} ({tenant.code})</option>
+							<option value={tenant.id} class="text-neutral bg-base-100">{tenant.name} ({tenant.code})</option>
 						{/each}
 					</select>
 				</label>
@@ -335,9 +356,9 @@
 					<div class="label pb-1">
 						<span class="label-text font-semibold text-base-content">Role <span class="text-error">*</span></span>
 					</div>
-					<select class="select select-bordered w-full text-base-content" bind:value={formData.role}>
+					<select class="select select-bordered w-full text-neutral bg-base-100" bind:value={formData.role}>
 						{#each roles as role}
-							<option value={role.value}>{role.label}</option>
+							<option value={role.value} class="text-neutral bg-base-100">{role.label}</option>
 						{/each}
 					</select>
 					<div class="label pt-1 pb-0">
@@ -350,9 +371,9 @@
 					<div class="label pb-1">
 						<span class="label-text font-semibold text-base-content">Status</span>
 					</div>
-					<select class="select select-bordered w-full text-base-content" bind:value={formData.status}>
-						<option value="active">Aktif</option>
-						<option value="inactive">Nonaktif</option>
+					<select class="select select-bordered w-full text-neutral bg-base-100" bind:value={formData.status}>
+						<option value="active" class="text-neutral bg-base-100">Aktif</option>
+						<option value="inactive" class="text-neutral bg-base-100">Nonaktif</option>
 					</select>
 				</div>
 			</div>
@@ -376,3 +397,17 @@
 		</form>
 	</div>
 {/if}
+
+<style>
+	/* Override global select color to use dark navy/black instead of --bc */
+	.select,
+	select {
+		color: hsl(215 16% 27%) !important; /* neutral color - dark navy blue */
+	}
+	
+	.select option,
+	select option {
+		color: hsl(215 16% 27%) !important; /* neutral color - dark navy blue */
+		background-color: hsl(var(--b1)) !important;
+	}
+</style>

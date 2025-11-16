@@ -35,7 +35,9 @@ class ConfigController extends Controller
             }
         }
 
-        $config = ConfigModule::firstOrCreate(
+        // Use withoutGlobalScope to ensure we can create/access config for specific tenant
+        // even if global scope is active (for superadmin scenarios)
+        $config = ConfigModule::withoutGlobalScope('tenant')->firstOrCreate(
             ['tenant_id' => $tenantId],
             [
                 'core_payroll' => true,
@@ -95,7 +97,9 @@ class ConfigController extends Controller
             'syariah_extension' => 'sometimes|boolean',
         ]);
 
-        $config = ConfigModule::updateOrCreate(
+        // Use withoutGlobalScope to ensure we can update/create config for specific tenant
+        // even if global scope is active (for superadmin scenarios)
+        $config = ConfigModule::withoutGlobalScope('tenant')->updateOrCreate(
             ['tenant_id' => $tenantId],
             $validated
         );
@@ -135,6 +139,7 @@ class ConfigController extends Controller
                 'neutral' => '#3d4451',
                 'base100' => '#ffffff',
                 'button' => '#0ea5e9',
+                'link_hover' => '#0ea5e9',
                 'badge_success' => '#10b981',
                 'badge_error' => '#ef4444',
                 'badge_primary' => '#0ea5e9',
@@ -189,6 +194,7 @@ class ConfigController extends Controller
             'neutral' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'base100' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'button' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'link_hover' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'badge_success' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'badge_error' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'badge_primary' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
@@ -246,28 +252,23 @@ class ConfigController extends Controller
 
         $schemes = $query->orderBy('code')->get();
 
-        // Transform to frontend format
-        $transformed = $schemes->map(function ($scheme) {
+        // Return schemes directly as array (matching frontend IdentifierScheme interface)
+        return response()->json($schemes->map(function ($scheme) {
             return [
                 'id' => $scheme->id,
                 'code' => $scheme->code,
                 'label' => $scheme->label,
+                'prefix' => $scheme->prefix,
                 'entity_type' => $scheme->entity_type,
-                'normalize' => $scheme->normalize_rule,
-                'patterns' => $scheme->regex_pattern ? [$scheme->regex_pattern] : [],
-                'length' => [
-                    'min' => $scheme->length_min,
-                    'max' => $scheme->length_max,
-                ],
+                'regex_pattern' => $scheme->regex_pattern,
+                'length_min' => $scheme->length_min,
+                'length_max' => $scheme->length_max,
+                'normalize_rule' => $scheme->normalize_rule,
                 'example' => $scheme->example,
                 'checksum_type' => $scheme->checksum_type,
+                'tenant_id' => $scheme->tenant_id,
             ];
-        });
-
-        return response()->json([
-            'entity' => $request->input('entity'),
-            'schemes' => $transformed,
-        ]);
+        })->values()->all());
     }
 
     /**
@@ -307,13 +308,10 @@ class ConfigController extends Controller
         $validated = $request->validate([
             'code' => 'required|string|max:50',
             'label' => 'required|string|max:255',
-            'entity_type' => 'nullable|string|max:50',
-            'regex_pattern' => 'nullable|string',
-            'length_min' => 'nullable|integer|min:1',
-            'length_max' => 'nullable|integer|min:1|gte:length_min',
-            'normalize_rule' => 'nullable|string|in:NUMERIC,ALNUM,UPPER,NONE',
-            'example' => 'nullable|string|max:50',
-            'checksum_type' => 'nullable|string|in:LUHN,MOD_N,NONE',
+            'prefix' => 'required|string|max:20', // Prefix wajib (contoh: "NTB")
+            'format_type' => 'required|string|in:NUMERIC,ALPHANUMERIC', // Format bagian belakang
+            'length_min' => 'required|integer|min:1',
+            'length_max' => 'required|integer|min:1|gte:length_min',
         ]);
 
         // Check unique code per tenant (or globally if tenant_id is null)
@@ -328,17 +326,33 @@ class ConfigController extends Controller
             ], 422);
         }
 
+        // Auto-generate normalize_rule dari format_type
+        $normalizeRule = $validated['format_type'] === 'NUMERIC' ? 'NUMERIC' : 'ALNUM';
+        
+        // Auto-generate regex_pattern untuk bagian belakang (setelah prefix)
+        $min = $validated['length_min'];
+        $max = $validated['length_max'];
+        if ($validated['format_type'] === 'NUMERIC') {
+            $regexPattern = $min === $max ? "^[0-9]{{$min}}$" : "^[0-9]{{$min},{$max}}$";
+        } else {
+            $regexPattern = $min === $max ? "^[A-Za-z0-9]{{$min}}$" : "^[A-Za-z0-9]{{$min},{$max}}$";
+        }
+        
+        // Auto-generate example
+        $example = $validated['prefix'] . str_repeat($validated['format_type'] === 'NUMERIC' ? '1' : 'A', $min);
+
         $scheme = IdentifierScheme::create([
             'tenant_id' => $tenantId,
             'code' => $validated['code'],
             'label' => $validated['label'],
-            'entity_type' => $validated['entity_type'] ?? null,
-            'regex_pattern' => $validated['regex_pattern'] ?? null,
-            'length_min' => $validated['length_min'] ?? null,
-            'length_max' => $validated['length_max'] ?? null,
-            'normalize_rule' => $validated['normalize_rule'] ?? 'NONE',
-            'example' => $validated['example'] ?? null,
-            'checksum_type' => $validated['checksum_type'] ?? 'NONE',
+            'prefix' => strtoupper($validated['prefix']), // Simpan uppercase
+            'entity_type' => null,
+            'regex_pattern' => $regexPattern,
+            'length_min' => $validated['length_min'],
+            'length_max' => $validated['length_max'],
+            'normalize_rule' => $normalizeRule,
+            'example' => $example,
+            'checksum_type' => 'NONE', // Selalu NONE, tidak digunakan
         ]);
 
         return response()->json($scheme, 201);
@@ -386,14 +400,40 @@ class ConfigController extends Controller
         $validated = $request->validate([
             'code' => ['sometimes', 'string', 'max:50', Rule::unique('identifier_schemes')->where('tenant_id', $scheme->tenant_id)->ignore($scheme->id)],
             'label' => 'sometimes|string|max:255',
-            'entity_type' => 'nullable|string|max:50',
-            'regex_pattern' => 'nullable|string',
+            'prefix' => 'sometimes|string|max:20',
+            'format_type' => 'sometimes|string|in:NUMERIC,ALPHANUMERIC',
             'length_min' => 'nullable|integer|min:1',
             'length_max' => 'nullable|integer|min:1|gte:length_min',
-            'normalize_rule' => 'sometimes|string|in:NUMERIC,ALNUM,UPPER,NONE',
-            'example' => 'nullable|string|max:50',
-            'checksum_type' => 'sometimes|string|in:LUHN,MOD_N,NONE',
         ]);
+
+        // Jika ada format_type, auto-generate seperti create
+        if (isset($validated['format_type'])) {
+            $normalizeRule = $validated['format_type'] === 'NUMERIC' ? 'NUMERIC' : 'ALNUM';
+            $min = $validated['length_min'] ?? $scheme->length_min;
+            $max = $validated['length_max'] ?? $scheme->length_max;
+            $prefix = $validated['prefix'] ?? $scheme->prefix;
+            
+            if ($min && $max) {
+                if ($validated['format_type'] === 'NUMERIC') {
+                    $regexPattern = $min === $max ? "^[0-9]{{$min}}$" : "^[0-9]{{$min},{$max}}$";
+                } else {
+                    $regexPattern = $min === $max ? "^[A-Za-z0-9]{{$min}}$" : "^[A-Za-z0-9]{{$min},{$max}}$";
+                }
+                $validated['regex_pattern'] = $regexPattern;
+            }
+            
+            $validated['normalize_rule'] = $normalizeRule;
+            if ($prefix && $min) {
+                $validated['example'] = $prefix . str_repeat($validated['format_type'] === 'NUMERIC' ? '1' : 'A', $min);
+            }
+            $validated['checksum_type'] = 'NONE';
+            
+            unset($validated['format_type']); // Hapus format_type, sudah di-convert
+        }
+        
+        if (isset($validated['prefix'])) {
+            $validated['prefix'] = strtoupper($validated['prefix']);
+        }
 
         $scheme->update($validated);
 

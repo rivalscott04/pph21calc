@@ -56,9 +56,12 @@ class PPh21CalculatorService
         $biayaJabatan = $this->calculateBiayaJabatan($bruto, $period->month);
         $iuranPensiun = $this->calculateIuranPensiun($bruto, $deductions, $period->month);
         $zakat = $this->calculateZakat($deductions);
+        
+        // Calculate other tax-deductible deductions
+        $otherTaxDeductibleDeductions = $this->calculateOtherTaxDeductibleDeductions($deductions);
 
         // 3. Calculate Neto Masa
-        $netoMasa = $bruto - $biayaJabatan - $iuranPensiun - $zakat;
+        $netoMasa = $bruto - $biayaJabatan - $iuranPensiun - $zakat - $otherTaxDeductibleDeductions;
 
         // 4. Get PTKP
         $ptkpCode = $payrollSubject->ptkp_code;
@@ -255,8 +258,22 @@ class PPh21CalculatorService
      */
     private function calculateIuranPensiun(float $bruto, Collection $deductions, int $month): float
     {
-        // Check if iuran_pensiun is already in deductions
-        $iuranPensiunFromDeductions = $deductions->where('type', 'iuran_pensiun')->sum('amount');
+        // Load deduction components if not loaded
+        $deductions = $deductions->loadMissing('deductionComponent');
+        
+        // Find iuran_pensiun deduction component (by code or by type='mandatory' with calculation_type='manual')
+        $iuranPensiunDeductions = $deductions->filter(function ($deduction) {
+            if (!$deduction->deductionComponent) {
+                // Fallback: check old type field for backward compatibility
+                return $deduction->type === 'iuran_pensiun';
+            }
+            return $deduction->deductionComponent->code === 'iuran_pensiun' 
+                || ($deduction->deductionComponent->type === 'mandatory' 
+                    && $deduction->deductionComponent->calculation_type === 'manual'
+                    && str_contains(strtolower($deduction->deductionComponent->name), 'iuran pensiun'));
+        });
+        
+        $iuranPensiunFromDeductions = $iuranPensiunDeductions->sum('amount');
         
         if ($iuranPensiunFromDeductions > 0) {
             // Use the deduction amount, but cap it
@@ -286,7 +303,49 @@ class PPh21CalculatorService
      */
     private function calculateZakat(Collection $deductions): float
     {
-        return (float) $deductions->where('type', 'zakat')->sum('amount');
+        // Load deduction components if not loaded
+        $deductions = $deductions->loadMissing('deductionComponent');
+        
+        // Find zakat deduction component (by code or by name)
+        $zakatDeductions = $deductions->filter(function ($deduction) {
+            if (!$deduction->deductionComponent) {
+                // Fallback: check old type field for backward compatibility
+                return $deduction->type === 'zakat';
+            }
+            return $deduction->deductionComponent->code === 'zakat' 
+                || str_contains(strtolower($deduction->deductionComponent->name), 'zakat');
+        });
+        
+        return (float) $zakatDeductions->sum('amount');
+    }
+
+    /**
+     * Calculate other tax-deductible deductions (excluding biaya_jabatan, iuran_pensiun, zakat)
+     */
+    private function calculateOtherTaxDeductibleDeductions(Collection $deductions): float
+    {
+        // Load deduction components if not loaded
+        $deductions = $deductions->loadMissing('deductionComponent');
+        
+        // Filter deductions that are tax-deductible and not biaya_jabatan, iuran_pensiun, or zakat
+        $otherDeductions = $deductions->filter(function ($deduction) {
+            if (!$deduction->deductionComponent) {
+                // Fallback: check old type field for backward compatibility
+                // Exclude iuran_pensiun, zakat, and lainnya (lainnya might be biaya_jabatan)
+                return !in_array($deduction->type, ['iuran_pensiun', 'zakat']);
+            }
+            
+            // Exclude biaya_jabatan (auto-calculated), iuran_pensiun, zakat
+            $code = $deduction->deductionComponent->code;
+            if (in_array($code, ['biaya_jabatan', 'iuran_pensiun', 'zakat'])) {
+                return false;
+            }
+            
+            // Only include tax-deductible deductions
+            return $deduction->deductionComponent->is_tax_deductible;
+        });
+        
+        return (float) $otherDeductions->sum('amount');
     }
 
     /**

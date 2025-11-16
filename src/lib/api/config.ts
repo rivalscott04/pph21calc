@@ -23,6 +23,7 @@ export interface ConfigBranding {
 	neutral: string;
 	base100: string;
 	button: string;
+	link_hover: string;
 	badge_success: string;
 	badge_error: string;
 	badge_primary: string;
@@ -38,7 +39,8 @@ export interface IdentifierScheme {
 	id: number;
 	code: string;
 	label: string;
-	entity_type: string;
+	prefix: string | null; // Prefix untuk ID (contoh: "NTB")
+	entity_type: string | null;
 	regex_pattern: string | null;
 	length_min: number | null;
 	length_max: number | null;
@@ -75,7 +77,7 @@ export const configApi = {
 		return await apiGet<IdentifierScheme[]>('/config/identifier-schemes', Object.keys(params).length > 0 ? params : undefined);
 	},
 	
-	async createIdentifierScheme(scheme: Omit<IdentifierScheme, 'id' | 'tenant_id'>, tenantId?: number): Promise<IdentifierScheme> {
+	async createIdentifierScheme(scheme: any, tenantId?: number): Promise<IdentifierScheme> {
 		return await apiPost<IdentifierScheme>('/config/identifier-schemes', { ...scheme, tenant_id: tenantId });
 	},
 	

@@ -214,6 +214,16 @@ p, span, div, a, button, label, input, select, textarea {
 	font-weight: 500; /* Medium weight for body text */
 }
 
+/* Select dropdown - ensure text is black/readable */
+select {
+	color: #000000 !important;
+}
+
+select option {
+	color: #000000 !important;
+	background-color: hsl(var(--b1)) !important;
+}
+
 /* Buttons and interactive elements should be more prominent */
 .btn {
 	font-weight: 600; /* Semi-bold for buttons */
@@ -280,6 +290,9 @@ p, span, div, a, button, label, input, select, textarea {
   /* Button color - custom branding color */
   --btn-color: #0ea5e9; /* default button color, will be overridden by applyBrandTheme */
   
+  /* Link hover color - custom branding color */
+  --link-hover-color: #0ea5e9; /* default link hover color, will be overridden by applyBrandTheme */
+  
   /* Badge colors - custom branding colors */
   --badge-success-color: #10b981; /* default badge success color, will be overridden by applyBrandTheme */
   --badge-error-color: #ef4444; /* default badge error color, will be overridden by applyBrandTheme */
@@ -299,11 +312,25 @@ p, span, div, a, button, label, input, select, textarea {
   color: white !important;
 }
 
+.btn-brand,
+.btn-brand *,
+.btn-brand svg,
+.btn-brand span {
+  color: white !important;
+}
+
 .btn-brand:hover {
   background-color: var(--btn-color) !important;
   border-color: var(--btn-color) !important;
   color: white !important;
   opacity: 0.9;
+}
+
+.btn-brand:hover,
+.btn-brand:hover *,
+.btn-brand:hover svg,
+.btn-brand:hover span {
+  color: white !important;
 }
 
 .btn-brand:active {
@@ -313,9 +340,23 @@ p, span, div, a, button, label, input, select, textarea {
   opacity: 0.8;
 }
 
+.btn-brand:active,
+.btn-brand:active *,
+.btn-brand:active svg,
+.btn-brand:active span {
+  color: white !important;
+}
+
 .btn-brand:focus {
   background-color: var(--btn-color) !important;
   border-color: var(--btn-color) !important;
+  color: white !important;
+}
+
+.btn-brand:focus,
+.btn-brand:focus *,
+.btn-brand:focus svg,
+.btn-brand:focus span {
   color: white !important;
 }
 
@@ -404,4 +445,14 @@ p, span, div, a, button, label, input, select, textarea {
 
 .alert.toast-error-brand svg {
   color: white !important;
+}
+
+/* Apply custom link hover color to links */
+a:hover:not(.btn):not(.menu a):not(.menu button) {
+  color: var(--link-hover-color) !important;
+}
+
+/* Apply link hover color to daisyUI link component */
+.link:hover {
+  color: var(--link-hover-color) !important;
 }

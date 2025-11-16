@@ -117,7 +117,7 @@
 									</td>
 									<td class="text-right">
 										<button
-											class="btn btn-sm btn-primary"
+											class="btn btn-sm btn-brand"
 											on:click={() => handleDetailClick(employee.employment_id, employee.year)}
 										>
 											Detail

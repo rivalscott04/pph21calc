@@ -21,13 +21,14 @@ class IdentifierScheme extends Model
         'tenant_id',
         'code',
         'label',
+        'prefix', // Prefix untuk ID (contoh: "NTB")
         'entity_type',
-        'regex_pattern',
-        'length_min',
-        'length_max',
-        'normalize_rule',
-        'example',
-        'checksum_type',
+        'regex_pattern', // Auto-generate dari format_type
+        'length_min', // Panjang bagian belakang (setelah prefix)
+        'length_max', // Panjang bagian belakang (setelah prefix)
+        'normalize_rule', // NUMERIC/ALNUM/UPPER/NONE
+        'example', // Auto-generate
+        'checksum_type', // Tetap ada untuk backward compatibility, default NONE
     ];
 
     protected function casts(): array

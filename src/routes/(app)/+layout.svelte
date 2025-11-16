@@ -35,6 +35,15 @@
 		// Load auth from storage first
 		const hasStoredAuth = auth.loadFromStorage();
 		
+		// Initialize brand theme watcher - will reload when tenant changes
+		import('$lib/stores/brand.js').then(({ watchTenantAndReloadTheme, initBrandTheme }) => {
+			watchTenantAndReloadTheme();
+			// Initial load
+			initBrandTheme().catch((error) => {
+				console.error('Failed to initialize brand theme:', error);
+			});
+		});
+		
 		// If we have a token, verify it with backend
 		if (hasStoredAuth) {
 			checkingAuth = true;
@@ -107,7 +116,7 @@
 		<div class="navbar bg-base-100 shadow-sm border-b border-base-300">
 			<div class="flex-none lg:hidden">
 				<label for="app-drawer" class="btn btn-ghost btn-square">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-6 h-6 stroke-current" style="color: hsl(var(--n));">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-6 h-6 stroke-current text-neutral">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
 					</svg>
 				</label>
@@ -165,7 +174,7 @@
 			<div class="flex items-center justify-between w-full p-4 border-b border-base-300 bg-base-100">
 				<h2 class="text-xl font-bold text-base-content is-drawer-close:hidden">PPH21</h2>
 				<label for="app-drawer" class="btn btn-ghost btn-circle btn-sm is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip="Toggle sidebar">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-5 h-5 stroke-current" style="color: hsl(var(--n));">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-5 h-5 stroke-current text-neutral">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
 					</svg>
 				</label>
@@ -265,6 +274,30 @@
 						<span class="is-drawer-close:hidden">Pegawai</span>
 					</a>
 				</li>
+				<li>
+					<a 
+						href="/master/components" 
+						class="is-drawer-close:tooltip is-drawer-close:tooltip-right {$page.url.pathname.startsWith('/master/components') ? 'active' : ''}" 
+						data-tip="Komponen Penghasilan"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						<span class="is-drawer-close:hidden">Komponen Penghasilan</span>
+					</a>
+				</li>
+				<li>
+					<a 
+						href="/master/deduction-components" 
+						class="is-drawer-close:tooltip is-drawer-close:tooltip-right {$page.url.pathname.startsWith('/master/deduction-components') ? 'active' : ''}" 
+						data-tip="Komponen Pengurang"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+						</svg>
+						<span class="is-drawer-close:hidden">Komponen Pengurang</span>
+					</a>
+				</li>
 				{/if}
 				
 				<!-- Settings - hanya TENANT_ADMIN -->
@@ -331,3 +364,12 @@
 
 <!-- Toast notifications -->
 <Toaster />
+
+<style>
+	/* Ensure SVG icons in btn-ghost buttons turn white on hover */
+	.btn-ghost:hover svg,
+	.btn-ghost:hover svg path {
+		color: hsl(0 0% 100%) !important;
+		stroke: hsl(0 0% 100%) !important;
+	}
+</style>

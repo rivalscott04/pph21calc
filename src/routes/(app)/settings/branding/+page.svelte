@@ -15,6 +15,7 @@
 		neutral: '#3d4451',
 		base100: '#1e293b',
 		button: '#0ea5e9',
+		link_hover: '#0ea5e9',
 		badge_success: '#10b981',
 		badge_error: '#ef4444',
 		badge_primary: '#0ea5e9',
@@ -47,6 +48,7 @@
 			neutral: '#3d4451',
 			base100: '#1e293b',
 			button: '#0ea5e9',
+			link_hover: '#0ea5e9',
 			badge_success: '#10b981',
 			badge_error: '#ef4444',
 			badge_primary: '#0ea5e9',
@@ -160,7 +162,7 @@
 									<label class="form-control">
 							<div class="label">
 								<span class="label-text font-semibold text-base-content">Warna Secondary</span>
-								<span class="label-text-alt text-base-content opacity-60">Warna sekunder brand</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna sekunder brand (digunakan untuk stat values, badge secondary)</span>
 							</div>
 							<div class="flex gap-3 items-center">
 								<input
@@ -184,7 +186,7 @@
 									<label class="form-control">
 							<div class="label">
 								<span class="label-text font-semibold text-base-content">Warna Accent</span>
-								<span class="label-text-alt text-base-content opacity-60">Warna aksen/highlight</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna aksen/highlight (digunakan untuk stat values, badge accent)</span>
 							</div>
 							<div class="flex gap-3 items-center">
 								<input
@@ -204,11 +206,11 @@
 							</div>
 									</label>
 
-									<!-- Neutral Color -->
+									<!-- Neutral Color (Text Color) -->
 									<label class="form-control">
 							<div class="label">
-								<span class="label-text font-semibold text-base-content">Warna Neutral</span>
-								<span class="label-text-alt text-base-content opacity-60">Warna netral/abu-abu</span>
+								<span class="label-text font-semibold text-base-content">Warna Text</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk teks di menu dan komponen</span>
 							</div>
 							<div class="flex gap-3 items-center">
 								<input
@@ -281,6 +283,30 @@
 									class="input input-bordered flex-1 font-mono"
 									placeholder="#0ea5e9"
 									bind:value={colors.button}
+									readonly
+									tabindex="-1"
+								/>
+							</div>
+									</label>
+
+									<!-- Link Hover Color -->
+									<label class="form-control">
+							<div class="label">
+								<span class="label-text font-semibold text-base-content">Warna Link Hover</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk link ketika di-hover</span>
+							</div>
+							<div class="flex gap-3 items-center">
+								<input
+									type="color"
+									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
+									bind:value={colors.link_hover}
+									on:input={(e) => updateColor('link_hover', e.currentTarget.value)}
+								/>
+								<input
+									type="text"
+									class="input input-bordered flex-1 font-mono"
+									placeholder="#0ea5e9"
+									bind:value={colors.link_hover}
 									readonly
 									tabindex="-1"
 								/>

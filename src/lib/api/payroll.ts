@@ -43,8 +43,17 @@ export interface Deduction {
 	id: number;
 	period_id: number;
 	employment_id: number;
-	type: 'iuran_pensiun' | 'zakat' | 'lainnya';
+	deduction_component_id?: number;
+	type?: 'iuran_pensiun' | 'zakat' | 'lainnya'; // Keep for backward compatibility
 	amount: number;
+	deductionComponent?: {
+		id: number;
+		code: string;
+		name: string;
+		type: string;
+		calculation_type: string;
+		is_tax_deductible: boolean;
+	};
 	employment?: {
 		id: number;
 		person?: {
@@ -146,7 +155,7 @@ export const payrollApi = {
 		period_id: number;
 		deductions: Array<{
 			employment_id: number;
-			type: 'iuran_pensiun' | 'zakat' | 'lainnya';
+			deduction_component_id: number;
 			amount: number;
 		}>;
 	}): Promise<{ message: string; created: number; updated: number }> {

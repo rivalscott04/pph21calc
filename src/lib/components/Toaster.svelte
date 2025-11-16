@@ -3,7 +3,7 @@
 	import Toast from './Toast.svelte';
 </script>
 
-<div class="toast toast-top toast-end z-50 flex flex-col gap-3 items-end">
+<div class="toast toast-top toast-end z-[9999] flex flex-col gap-3 items-end">
 	{#each $toasts as toastItem (toastItem.id)}
 		<Toast
 			message={toastItem.message}

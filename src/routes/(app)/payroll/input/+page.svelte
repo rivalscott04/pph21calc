@@ -5,6 +5,7 @@
 	import { payrollApi, type Period, type Earning, type Deduction } from '$lib/api/payroll.js';
 	import { employmentsApi, type Employment } from '$lib/api/employments.js';
 	import { componentsApi, type Component } from '$lib/api/components.js';
+	import { deductionComponentsApi, type DeductionComponent } from '$lib/api/deductionComponents.js';
 	import { calculatorApi, type CalculationHistory } from '$lib/api/calculator.js';
 	import { toast } from '$lib/stores/toast.js';
 
@@ -14,8 +15,9 @@
 	let period: Period | null = null;
 	let employments: Employment[] = [];
 	let components: Component[] = [];
+	let deductionComponents: DeductionComponent[] = [];
 	let earnings: Map<number, Map<number, number>> = new Map(); // employment_id -> component_id -> amount
-	let deductions: Map<number, { iuran_pensiun: number; zakat: number; lainnya: number }> = new Map(); // employment_id -> deductions
+	let deductions: Map<number, Map<number, number>> = new Map(); // employment_id -> deduction_component_id -> amount
 	let earningsUpdateTrigger = 0; // Trigger for reactivity
 	let deductionsUpdateTrigger = 0; // Trigger for reactivity
 	let earningsTotals: Map<number, number> = new Map();
@@ -76,7 +78,7 @@
 		earningsUpdateTrigger++; // Trigger reactivity
 	}
 
-	function handleDeductionInput(employmentId: number, type: 'iuran_pensiun' | 'zakat' | 'lainnya', event: Event) {
+	function handleDeductionInput(employmentId: number, deductionComponentId: number, event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const value = input.value;
 		const numValue = parseFormattedNumber(value);
@@ -86,9 +88,9 @@
 		input.value = formatted;
 		
 		if (!deductions.has(employmentId)) {
-			deductions.set(employmentId, { iuran_pensiun: 0, zakat: 0, lainnya: 0 });
+			deductions.set(employmentId, new Map());
 		}
-		deductions.get(employmentId)![type] = safeValue;
+		deductions.get(employmentId)!.set(deductionComponentId, safeValue);
 		deductionsUpdateTrigger++; // Trigger reactivity
 	}
 
@@ -100,11 +102,11 @@
 		return amount > 0 ? formatNumber(amount) : '';
 	}
 
-	function getDeductionAmount(employmentId: number, type: 'iuran_pensiun' | 'zakat' | 'lainnya'): string {
+	function getDeductionAmount(employmentId: number, deductionComponentId: number): string {
 		deductionsUpdateTrigger; // Read trigger for reactivity
 		const empDeductions = deductions.get(employmentId);
 		if (!empDeductions) return '';
-		const amount = empDeductions[type] || 0;
+		const amount = empDeductions.get(deductionComponentId) || 0;
 		return amount > 0 ? formatNumber(amount) : '';
 	}
 
@@ -124,10 +126,11 @@
 		deductionsUpdateTrigger; // Read trigger for reactivity
 		const empDeductions = deductions.get(employmentId);
 		if (!empDeductions) return 0;
-		const iuran = Number(empDeductions.iuran_pensiun) || 0;
-		const zakat = Number(empDeductions.zakat) || 0;
-		const lainnya = Number(empDeductions.lainnya) || 0;
-		const total = iuran + zakat + lainnya;
+		let total = 0;
+		empDeductions.forEach((amount) => {
+			const numAmount = Number(amount) || 0;
+			total += numAmount;
+		});
 		return isNaN(total) ? 0 : total;
 	}
 
@@ -148,11 +151,11 @@
 		deductionsUpdateTrigger; // Read trigger for reactivity
 		let hasData = false;
 		deductions.forEach((empDeductions) => {
-			if ((empDeductions.iuran_pensiun || 0) > 0 || 
-			    (empDeductions.zakat || 0) > 0 || 
-			    (empDeductions.lainnya || 0) > 0) {
-				hasData = true;
-			}
+			empDeductions.forEach((amount) => {
+				if (amount > 0) {
+					hasData = true;
+				}
+			});
 		});
 		return hasData;
 	}
@@ -242,14 +245,33 @@
 	async function loadComponents() {
 		try {
 			const response = await componentsApi.list({ per_page: 1000 });
-			components = response.data || [];
+			// Filter hanya komponen yang aktif
+			components = (response.data || []).filter(c => c.is_active !== false);
+			// Sort by priority
+			components.sort((a, b) => (a.priority || 0) - (b.priority || 0));
 			if (components.length === 0) {
-				toast.warning('Belum ada komponen earnings. Silakan buat komponen terlebih dahulu.');
+				toast.warning('Belum ada komponen earnings aktif. Silakan buat komponen terlebih dahulu.');
 			}
 		} catch (error) {
 			console.error('Failed to load components:', error);
 			toast.error('Gagal memuat daftar komponen');
 			components = [];
+		}
+	}
+
+	async function loadDeductionComponents() {
+		try {
+			const response = await deductionComponentsApi.list({ 
+				is_active: true,
+				per_page: 1000 
+			});
+			deductionComponents = response.data || [];
+			// Sort by priority
+			deductionComponents.sort((a, b) => (a.priority || 0) - (b.priority || 0));
+		} catch (error) {
+			console.error('Failed to load deduction components:', error);
+			toast.error('Gagal memuat daftar komponen deduction');
+			deductionComponents = [];
 		}
 	}
 
@@ -282,10 +304,19 @@
 			
 			existingDeductions.forEach((deduction) => {
 				if (!deductions.has(deduction.employment_id)) {
-					deductions.set(deduction.employment_id, { iuran_pensiun: 0, zakat: 0, lainnya: 0 });
+					deductions.set(deduction.employment_id, new Map());
 				}
 				const empDeductions = deductions.get(deduction.employment_id)!;
-				empDeductions[deduction.type] = (empDeductions[deduction.type] || 0) + deduction.amount;
+				// Use deduction_component_id if available, otherwise fallback to type mapping
+				const deductionComponentId = deduction.deduction_component_id || 
+					(deduction.type === 'iuran_pensiun' ? deductionComponents.find(dc => dc.code === 'iuran_pensiun')?.id :
+					 deduction.type === 'zakat' ? deductionComponents.find(dc => dc.code === 'zakat')?.id :
+					 deductionComponents.find(dc => dc.code === 'biaya_jabatan' || dc.code === 'lainnya')?.id);
+				
+				if (deductionComponentId) {
+					const existingAmount = empDeductions.get(deductionComponentId) || 0;
+					empDeductions.set(deductionComponentId, existingAmount + deduction.amount);
+				}
 			});
 			
 			earningsUpdateTrigger++;
@@ -381,58 +412,55 @@
 				// Data di history dari kalkulator biasanya annual, jadi selalu bagi 12 untuk dapat bulanan
 				if (history.iuran_pensiun > 0 || history.zakat > 0 || history.biaya_jabatan > 0) {
 					if (!deductions.has(history.employment_id)) {
-						deductions.set(history.employment_id, { iuran_pensiun: 0, zakat: 0, lainnya: 0 });
+						deductions.set(history.employment_id, new Map());
 					}
 					const empDeductions = deductions.get(history.employment_id)!;
+					
+					// Find deduction components by code
+					const iuranPensiunComponent = deductionComponents.find(dc => dc.code === 'iuran_pensiun');
+					const zakatComponent = deductionComponents.find(dc => dc.code === 'zakat');
 					
 					// Cek apakah bruto adalah annual (jika bruto > 50jt, pasti annual)
 					const brutoValue = Number(history.bruto) || 0;
 					const isAnnual = brutoValue > 50000000;
 					
-					// Hanya import jika belum ada data
-					if (empDeductions.iuran_pensiun === 0 && history.iuran_pensiun > 0) {
-						let value = Number(history.iuran_pensiun) || 0;
-						// Jika annual, bagi 12 untuk dapat bulanan
-						if (isAnnual && value > 0) {
-							value = Math.floor(value / 12);
+					// Import iuran pensiun
+					if (iuranPensiunComponent && history.iuran_pensiun > 0) {
+						const existingAmount = empDeductions.get(iuranPensiunComponent.id) || 0;
+						if (existingAmount === 0) {
+							let value = Number(history.iuran_pensiun) || 0;
+							// Jika annual, bagi 12 untuk dapat bulanan
+							if (isAnnual && value > 0) {
+								value = Math.floor(value / 12);
+							}
+							// Safety check: jika value masih terlalu besar dibanding bruto bulanan
+							const brutoMonthly = isAnnual ? Math.floor(brutoValue / 12) : brutoValue;
+							if (value > brutoMonthly * 0.1) {
+								value = Math.floor(value / 12);
+							}
+							empDeductions.set(iuranPensiunComponent.id, Math.floor(value));
 						}
-						// Safety check: jika value masih terlalu besar dibanding bruto bulanan
-						// Iuran pensiun biasanya < 5% dari bruto, jadi jika > 10% kemungkinan salah format
-						const brutoMonthly = isAnnual ? Math.floor(brutoValue / 12) : brutoValue;
-						if (value > brutoMonthly * 0.1) {
-							// Terlalu besar, kemungkinan masih annual atau salah format, bagi 12 lagi
-							value = Math.floor(value / 12);
-						}
-						empDeductions.iuran_pensiun = Math.floor(value);
 					}
-					if (empDeductions.zakat === 0 && history.zakat > 0) {
-						let value = Number(history.zakat) || 0;
-						// Jika annual, bagi 12 untuk dapat bulanan
-						if (isAnnual && value > 0) {
-							value = Math.floor(value / 12);
+					
+					// Import zakat
+					if (zakatComponent && history.zakat > 0) {
+						const existingAmount = empDeductions.get(zakatComponent.id) || 0;
+						if (existingAmount === 0) {
+							let value = Number(history.zakat) || 0;
+							// Jika annual, bagi 12 untuk dapat bulanan
+							if (isAnnual && value > 0) {
+								value = Math.floor(value / 12);
+							}
+							// Safety check
+							const brutoMonthly = isAnnual ? Math.floor(brutoValue / 12) : brutoValue;
+							if (value > brutoMonthly * 0.1) {
+								value = Math.floor(value / 12);
+							}
+							empDeductions.set(zakatComponent.id, Math.floor(value));
 						}
-						// Safety check
-						const brutoMonthly = isAnnual ? Math.floor(brutoValue / 12) : brutoValue;
-						if (value > brutoMonthly * 0.1) {
-							value = Math.floor(value / 12);
-						}
-						empDeductions.zakat = Math.floor(value);
 					}
-					// Biaya jabatan diimport ke "lainnya"
-					if (empDeductions.lainnya === 0 && history.biaya_jabatan > 0) {
-						let value = Number(history.biaya_jabatan) || 0;
-						// Jika annual, bagi 12 untuk dapat bulanan
-						if (isAnnual && value > 0) {
-							value = Math.floor(value / 12);
-						}
-						// Safety check: biaya jabatan biasanya 5% dari bruto (max 500rb/bulan atau 6jt/tahun)
-						const brutoMonthly = isAnnual ? Math.floor(brutoValue / 12) : brutoValue;
-						if (value > Math.min(brutoMonthly * 0.05, 500000)) {
-							// Terlalu besar, kemungkinan masih annual atau salah format, bagi 12 lagi
-							value = Math.floor(value / 12);
-						}
-						empDeductions.lainnya = Math.floor(value);
-					}
+					
+					// Note: biaya_jabatan tidak perlu diimport karena auto-calculated
 				}
 
 				importedCount++;
@@ -456,6 +484,26 @@
 
 	async function saveEarnings() {
 		if (!periodId) return;
+		
+		// Validasi mandatory fields
+		const mandatoryComponents = components.filter(c => c.is_mandatory);
+		const missingMandatory: string[] = [];
+		
+		employments.forEach(employment => {
+			mandatoryComponents.forEach(component => {
+				const empEarnings = earnings.get(employment.id);
+				const amount = empEarnings?.get(component.id) || 0;
+				if (amount <= 0) {
+					missingMandatory.push(`${employment.person?.full_name || 'Pegawai'} - ${component.name}`);
+				}
+			});
+		});
+		
+		if (missingMandatory.length > 0) {
+			toast.error(`Field wajib belum diisi: ${missingMandatory.slice(0, 3).join(', ')}${missingMandatory.length > 3 ? '...' : ''}`);
+			saving = false;
+			return;
+		}
 		
 		saving = true;
 		try {
@@ -509,32 +557,20 @@
 		try {
 			const deductionsData: Array<{
 				employment_id: number;
-				type: 'iuran_pensiun' | 'zakat' | 'lainnya';
+				deduction_component_id: number;
 				amount: number;
 			}> = [];
 
 			deductions.forEach((empDeductions, employmentId) => {
-				if (empDeductions.iuran_pensiun > 0) {
-					deductionsData.push({
-						employment_id: employmentId,
-						type: 'iuran_pensiun',
-						amount: empDeductions.iuran_pensiun
-					});
-				}
-				if (empDeductions.zakat > 0) {
-					deductionsData.push({
-						employment_id: employmentId,
-						type: 'zakat',
-						amount: empDeductions.zakat
-					});
-				}
-				if (empDeductions.lainnya > 0) {
-					deductionsData.push({
-						employment_id: employmentId,
-						type: 'lainnya',
-						amount: empDeductions.lainnya
-					});
-				}
+				empDeductions.forEach((amount, deductionComponentId) => {
+					if (amount > 0) {
+						deductionsData.push({
+							employment_id: employmentId,
+							deduction_component_id: deductionComponentId,
+							amount: Math.floor(amount)
+						});
+					}
+				});
 			});
 
 			if (deductionsData.length === 0) {
@@ -580,7 +616,8 @@
 			await Promise.all([
 				loadPeriod(),
 				loadEmployments(),
-				loadComponents()
+				loadComponents(),
+				loadDeductionComponents()
 			]);
 			await loadExistingData();
 		} catch (error) {
@@ -676,7 +713,7 @@
 								{/if}
 							</button>
 							<button 
-								class="btn btn-primary text-white"
+								class="btn btn-brand text-white"
 								on:click={saveEarnings}
 								disabled={saving || !hasEarnings}
 							>
@@ -708,7 +745,12 @@
 										<th class="text-base-content">Nama Pegawai</th>
 										<th class="text-base-content">Unit Organisasi</th>
 										{#each components as component}
-											<th class="text-base-content text-right">{component.name}</th>
+											<th class="text-base-content text-right">
+												{component.name}
+												{#if component.is_mandatory}
+													<span class="badge badge-xs badge-error ml-1">Wajib</span>
+												{/if}
+											</th>
 										{/each}
 										<th class="text-base-content text-right">Total</th>
 									</tr>
@@ -722,7 +764,7 @@
 												<td class="text-right">
 													<input 
 														type="text" 
-														class="input input-sm input-bordered text-right text-base-content w-full"
+														class="input input-sm input-bordered text-right text-base-content w-full {component.is_mandatory && !getEarningAmount(employment.id, component.id) ? 'input-error' : ''}"
 														placeholder="0"
 														value={getEarningAmount(employment.id, component.id)}
 														on:input={(e) => handleAmountInput(employment.id, component.id, e)}
@@ -749,7 +791,7 @@
 					<div class="flex justify-between items-center mb-4">
 						<h2 class="card-title text-base-content">Input Deductions</h2>
 						<button 
-							class="btn btn-primary text-white"
+							class="btn btn-brand text-white"
 							on:click={saveDeductions}
 							disabled={saving || !hasDeductions}
 						>
@@ -765,58 +807,56 @@
 						</button>
 					</div>
 
-					<div class="overflow-x-auto">
-						<table class="table table-zebra">
-							<thead>
-								<tr>
-									<th class="text-base-content">Nama Pegawai</th>
-									<th class="text-base-content">Unit Organisasi</th>
-									<th class="text-base-content text-right">Iuran Pensiun</th>
-									<th class="text-base-content text-right">Zakat</th>
-									<th class="text-base-content text-right">Biaya Jabatan</th>
-									<th class="text-base-content text-right">Total</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each filteredEmployments as employment}
+					{#if deductionComponents.length === 0}
+						<div class="alert alert-warning">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+							</svg>
+							<span>Belum ada komponen deductions. Silakan buat komponen deduction terlebih dahulu di menu Master Data.</span>
+						</div>
+					{:else}
+						<div class="overflow-x-auto">
+							<table class="table table-zebra">
+								<thead>
 									<tr>
-										<td class="text-base-content">{employment.person?.full_name || '-'}</td>
-										<td class="text-base-content">{employment.orgUnit?.name || '-'}</td>
-										<td class="text-right">
-											<input 
-												type="text" 
-												class="input input-sm input-bordered text-right text-base-content w-full"
-												placeholder="0"
-												value={getDeductionAmount(employment.id, 'iuran_pensiun')}
-												on:input={(e) => handleDeductionInput(employment.id, 'iuran_pensiun', e)}
-											/>
-										</td>
-										<td class="text-right">
-											<input 
-												type="text" 
-												class="input input-sm input-bordered text-right text-base-content w-full"
-												placeholder="0"
-												value={getDeductionAmount(employment.id, 'zakat')}
-												on:input={(e) => handleDeductionInput(employment.id, 'zakat', e)}
-											/>
-										</td>
-										<td class="text-right">
-											<input 
-												type="text" 
-												class="input input-sm input-bordered text-right text-base-content w-full"
-												placeholder="0"
-												value={getDeductionAmount(employment.id, 'lainnya')}
-												on:input={(e) => handleDeductionInput(employment.id, 'lainnya', e)}
-											/>
-										</td>
+										<th class="text-base-content">Nama Pegawai</th>
+										<th class="text-base-content">Unit Organisasi</th>
+										{#each deductionComponents.filter(dc => dc.calculation_type !== 'auto') as deductionComponent}
+											<th class="text-base-content text-right">
+												{deductionComponent.name}
+												{#if deductionComponent.type === 'mandatory'}
+													<span class="badge badge-xs badge-error ml-1">Wajib</span>
+												{/if}
+											</th>
+										{/each}
+										<th class="text-base-content text-right">Total</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each filteredEmployments as employment}
+										<tr>
+											<td class="text-base-content">{employment.person?.full_name || '-'}</td>
+											<td class="text-base-content">{employment.orgUnit?.name || '-'}</td>
+											{#each deductionComponents.filter(dc => dc.calculation_type !== 'auto') as deductionComponent}
+												<td class="text-right">
+													<input 
+														type="text" 
+														class="input input-sm input-bordered text-right text-base-content w-full {deductionComponent.type === 'mandatory' ? 'input-error' : ''}"
+														placeholder="0"
+														value={getDeductionAmount(employment.id, deductionComponent.id)}
+														on:input={(e) => handleDeductionInput(employment.id, deductionComponent.id, e)}
+													/>
+												</td>
+											{/each}
 											<td class="text-right font-semibold text-base-content">
 												{formatCurrency(deductionsTotals.get(employment.id) || 0)}
 											</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}

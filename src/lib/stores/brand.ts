@@ -10,6 +10,7 @@ export interface BrandColors {
 	neutral: string;
 	base100: string;
 	button: string;
+	link_hover: string;
 	badge_success: string;
 	badge_error: string;
 	badge_primary: string;
@@ -27,6 +28,7 @@ export const brandColors = writable<BrandColors>({
 	neutral: '#3d4451',
 	base100: '#1e293b', // dark slate-800
 	button: '#0ea5e9',
+	link_hover: '#0ea5e9',
 	badge_success: '#10b981',
 	badge_error: '#ef4444',
 	badge_primary: '#0ea5e9',
@@ -90,6 +92,8 @@ export function applyBrandTheme(colors: BrandColors) {
 		root.style.setProperty('--b1', hexToHsl(colors.base100));
 		// Button color - use custom CSS variable for button component
 		root.style.setProperty('--btn-color', colors.button);
+		// Link hover color - use custom CSS variable for link hover
+		root.style.setProperty('--link-hover-color', colors.link_hover);
 		// Badge colors - use custom CSS variables for badge components
 		root.style.setProperty('--badge-success-color', colors.badge_success);
 		root.style.setProperty('--badge-error-color', colors.badge_error);
@@ -104,35 +108,12 @@ export function applyBrandTheme(colors: BrandColors) {
 		setTimeout(() => {
 			brandColors.set(colors);
 		}, 0);
-		
-		// Save to localStorage
-		if (typeof window !== 'undefined') {
-			try {
-				localStorage.setItem('brandColors', JSON.stringify(colors));
-			} catch (e) {
-				console.error('Failed to save brand colors to localStorage', e);
-			}
-		}
 	} catch (error) {
 		console.error('Error applying brand theme:', error);
 	}
 }
 
-// Load brand colors from localStorage
-export function loadBrandColorsFromStorage(): BrandColors | null {
-	if (typeof window === 'undefined') return null;
-	
-	const stored = localStorage.getItem('brandColors');
-	if (stored) {
-		try {
-			return JSON.parse(stored);
-		} catch (e) {
-			console.error('Failed to parse brand colors from localStorage', e);
-			return null;
-		}
-	}
-	return null;
-}
+// Load brand colors from localStorage - REMOVED: Always load from API based on tenant context
 
 // Convert ConfigBranding to BrandColors
 function configToBrandColors(config: ConfigBranding): BrandColors {
@@ -143,6 +124,7 @@ function configToBrandColors(config: ConfigBranding): BrandColors {
 		neutral: config.neutral,
 		base100: config.base100,
 		button: config.button || config.primary, // fallback to primary if button not set
+		link_hover: config.link_hover || config.primary, // fallback to primary if link_hover not set
 		badge_success: config.badge_success || config.secondary, // fallback to secondary if badge_success not set
 		badge_error: config.badge_error || '#ef4444', // fallback to red if badge_error not set
 		badge_primary: config.badge_primary || config.primary, // fallback to primary if badge_primary not set
@@ -198,71 +180,72 @@ export async function updateBrandColorsViaAPI(colors: BrandColors, tenantId?: nu
 }
 
 // Initialize brand theme on app load (CLIENT-SIDE ONLY)
-export async function initBrandTheme() {
+// Always loads from API based on tenant context - NO localStorage
+export async function initBrandTheme(tenantId?: number) {
 	// Only run in browser (client-side)
 	if (typeof window === 'undefined' || typeof document === 'undefined') return;
 	
 	try {
-		// Try to load from API first (if authenticated)
-		// Use try-catch for get() in case store is not initialized
-		let user = null;
-		try {
-			user = get(auth);
-		} catch (e) {
-			// Store might not be ready yet, that's okay
+		// Get tenant ID from parameter or from auth store
+		let targetTenantId = tenantId;
+		
+		if (!targetTenantId) {
+			try {
+				const user = get(auth);
+				targetTenantId = user?.tenant?.id;
+			} catch (e) {
+				// Store might not be ready yet, that's okay
+			}
 		}
 		
-		if (user?.tenant?.id) {
+		// If we have tenant ID, load from API
+		if (targetTenantId) {
 			try {
-				const apiColors = await loadBrandColorsFromAPI();
+				const apiColors = await loadBrandColorsFromAPI(targetTenantId);
 				if (apiColors) {
 					applyBrandTheme(apiColors);
 					return;
 				}
 			} catch (error) {
-				// API call failed, fall through to localStorage/default
-				console.warn('Failed to load brand colors from API, using fallback:', error);
+				console.warn('Failed to load brand colors from API:', error);
 			}
 		}
 		
-		// Fallback to localStorage
-		const stored = loadBrandColorsFromStorage();
-		if (stored) {
-			applyBrandTheme(stored);
-		} else {
-			// Use default colors (dark theme) - don't update store to avoid re-render
-			const defaultColors: BrandColors = {
-				primary: '#0ea5e9',
-				secondary: '#10b981',
-				accent: '#f59e0b',
-				neutral: '#3d4451',
-				base100: '#1e293b',
-				button: '#0ea5e9',
-				badge_success: '#10b981',
-				badge_error: '#ef4444',
-				badge_primary: '#0ea5e9',
-				badge_secondary: '#10b981',
-				badge_accent: '#f59e0b',
-				toast_success: '#10b981',
-				toast_error: '#ef4444'
-			};
-			// Apply directly without updating store to prevent infinite loop
-			const root = document.documentElement;
-			root.setAttribute('data-theme', 'brand');
-			root.style.setProperty('--p', hexToHsl(defaultColors.primary));
-			root.style.setProperty('--s', hexToHsl(defaultColors.secondary));
-			root.style.setProperty('--a', hexToHsl(defaultColors.accent));
-			root.style.setProperty('--n', hexToHsl(defaultColors.neutral));
-			root.style.setProperty('--b1', hexToHsl(defaultColors.base100));
-			root.style.setProperty('--btn-color', defaultColors.button);
-			root.style.setProperty('--badge-success-color', defaultColors.badge_success);
-			root.style.setProperty('--badge-error-color', defaultColors.badge_error);
-			root.style.setProperty('--badge-primary-color', defaultColors.badge_primary);
-			root.style.setProperty('--badge-secondary-color', defaultColors.badge_secondary);
-			root.style.setProperty('--badge-accent-color', defaultColors.badge_accent);
-			root.style.setProperty('--toast-success-color', defaultColors.toast_success);
-			root.style.setProperty('--toast-error-color', defaultColors.toast_error);
-		}
+		// If no tenant ID or API failed, use defaults
+		// Use default colors (dark theme) - don't update store to avoid re-render
+		const defaultColors: BrandColors = {
+			primary: '#0ea5e9',
+			secondary: '#10b981',
+			accent: '#f59e0b',
+			neutral: '#3d4451',
+			base100: '#1e293b',
+			button: '#0ea5e9',
+			link_hover: '#0ea5e9',
+			badge_success: '#10b981',
+			badge_error: '#ef4444',
+			badge_primary: '#0ea5e9',
+			badge_secondary: '#10b981',
+			badge_accent: '#f59e0b',
+			toast_success: '#10b981',
+			toast_error: '#ef4444'
+		};
+		// Apply directly without updating store to prevent infinite loop
+		const root = document.documentElement;
+		root.setAttribute('data-theme', 'brand');
+		root.style.setProperty('--p', hexToHsl(defaultColors.primary));
+		root.style.setProperty('--s', hexToHsl(defaultColors.secondary));
+		root.style.setProperty('--a', hexToHsl(defaultColors.accent));
+		root.style.setProperty('--n', hexToHsl(defaultColors.neutral));
+		root.style.setProperty('--b1', hexToHsl(defaultColors.base100));
+		root.style.setProperty('--btn-color', defaultColors.button);
+		root.style.setProperty('--link-hover-color', defaultColors.link_hover);
+		root.style.setProperty('--badge-success-color', defaultColors.badge_success);
+		root.style.setProperty('--badge-error-color', defaultColors.badge_error);
+		root.style.setProperty('--badge-primary-color', defaultColors.badge_primary);
+		root.style.setProperty('--badge-secondary-color', defaultColors.badge_secondary);
+		root.style.setProperty('--badge-accent-color', defaultColors.badge_accent);
+		root.style.setProperty('--toast-success-color', defaultColors.toast_success);
+		root.style.setProperty('--toast-error-color', defaultColors.toast_error);
 	} catch (error) {
 		console.error('Error initializing brand theme:', error);
 		// Apply default colors even on error to prevent white screen
@@ -276,6 +259,7 @@ export async function initBrandTheme() {
 				neutral: '#3d4451',
 				base100: '#1e293b',
 				button: '#0ea5e9',
+				link_hover: '#0ea5e9',
 				badge_success: '#10b981',
 				badge_error: '#ef4444',
 				badge_primary: '#0ea5e9',
@@ -290,6 +274,7 @@ export async function initBrandTheme() {
 			root.style.setProperty('--n', hexToHsl(defaultColors.neutral));
 			root.style.setProperty('--b1', hexToHsl(defaultColors.base100));
 			root.style.setProperty('--btn-color', defaultColors.button);
+			root.style.setProperty('--link-hover-color', defaultColors.link_hover);
 			root.style.setProperty('--badge-success-color', defaultColors.badge_success);
 			root.style.setProperty('--badge-error-color', defaultColors.badge_error);
 			root.style.setProperty('--badge-primary-color', defaultColors.badge_primary);
@@ -299,5 +284,27 @@ export async function initBrandTheme() {
 			root.style.setProperty('--toast-error-color', defaultColors.toast_error);
 		}
 	}
+}
+
+// Watch auth store for tenant changes and reload brand theme
+// This ensures brand colors are always correct for the current tenant
+export function watchTenantAndReloadTheme() {
+	if (typeof window === 'undefined') return;
+	
+	let lastTenantId: number | undefined = undefined;
+	
+	auth.subscribe((state) => {
+		const currentTenantId = state.user?.tenant?.id;
+		
+		// If tenant changed, reload brand theme
+		if (currentTenantId !== lastTenantId) {
+			lastTenantId = currentTenantId;
+			if (currentTenantId) {
+				initBrandTheme(currentTenantId).catch((error) => {
+					console.error('Failed to reload brand theme on tenant change:', error);
+				});
+			}
+		}
+	});
 }
 

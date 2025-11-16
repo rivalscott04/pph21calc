@@ -12,6 +12,7 @@
 	let uploadLoading = false;
 	let showExportModal = false;
 	let exportData: any = null;
+	let showUploadConfirmModal = false;
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('id-ID', {
@@ -85,17 +86,23 @@
 		}
 	}
 
-	async function uploadToCoreTax() {
+	function openUploadConfirmModal() {
 		if (!selectedPeriod) {
 			toast.error('Pilih periode terlebih dahulu');
 			return;
 		}
+		showUploadConfirmModal = true;
+	}
 
-		if (!confirm('Apakah Anda yakin ingin mengirim data ke CoreTax?')) {
-			return;
-		}
+	function closeUploadConfirmModal() {
+		showUploadConfirmModal = false;
+	}
+
+	async function confirmUpload() {
+		if (!selectedPeriod) return;
 
 		uploadLoading = true;
+		closeUploadConfirmModal();
 		try {
 			const result = await coretaxApi.upload(selectedPeriod.id);
 			if (result.status === 'sent') {
@@ -160,11 +167,11 @@
 								</option>
 							{/each}
 						</select>
-						<label class="label">
+						<div class="label">
 							<span class="label-text-alt text-base-content opacity-60">
 								Hanya periode yang sudah diposting
 							</span>
-						</label>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -175,7 +182,7 @@
 					<h2 class="card-title text-base-content">Aksi</h2>
 					<div class="space-y-3 mt-4">
 						<button
-							class="btn btn-primary text-white w-full"
+							class="btn btn-brand text-white w-full"
 							on:click={exportBPA}
 							disabled={!selectedPeriod || exportLoading}
 						>
@@ -191,7 +198,7 @@
 						</button>
 						<button
 							class="btn btn-success text-white w-full"
-							on:click={uploadToCoreTax}
+							on:click={openUploadConfirmModal}
 							disabled={!selectedPeriod || uploadLoading}
 						>
 							{#if uploadLoading}
@@ -294,7 +301,7 @@
 			<h3 class="text-2xl font-bold text-base-content mb-4">BPA Data</h3>
 			<div class="flex justify-end gap-2 mb-4">
 				<button
-					class="btn btn-sm btn-primary text-white"
+					class="btn btn-sm btn-brand text-white"
 					on:click={() => downloadJSON(exportData, `bpa-${selectedPeriod?.year}-${selectedPeriod?.month}.json`)}
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -310,6 +317,63 @@
 		</div>
 		<form method="dialog" class="modal-backdrop">
 			<button on:click={() => (showExportModal = false)}>close</button>
+		</form>
+	</div>
+{/if}
+
+<!-- Upload Confirmation Modal -->
+{#if showUploadConfirmModal}
+	<div class="modal modal-open">
+		<div class="modal-box">
+			<div class="flex items-center gap-4 mb-6">
+				<div class="flex-shrink-0">
+					<div class="w-12 h-12 rounded-full bg-warning/20 flex items-center justify-center">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+					</div>
+				</div>
+				<div class="flex-1">
+					<h3 class="text-2xl font-bold text-base-content mb-1">Kirim ke CoreTax</h3>
+					<p class="text-sm text-base-content opacity-70">Konfirmasi pengiriman data</p>
+				</div>
+			</div>
+
+			<div class="bg-base-200 rounded-lg p-4 mb-6">
+				<p class="text-base-content">
+					Apakah Anda yakin ingin mengirim data ke CoreTax?
+				</p>
+				{#if selectedPeriod}
+					<p class="text-sm text-base-content opacity-70 mt-2">
+						Periode: <span class="font-semibold">
+							{new Date(selectedPeriod.year, selectedPeriod.month - 1).toLocaleString('id-ID', {
+								month: 'long',
+								year: 'numeric'
+							})}
+						</span>
+					</p>
+				{/if}
+			</div>
+
+			<div class="modal-action">
+				<button class="btn btn-outline btn-neutral text-base-content" on:click={closeUploadConfirmModal}>
+					Batal
+				</button>
+				<button class="btn btn-success text-white" on:click={confirmUpload} disabled={uploadLoading}>
+					{#if uploadLoading}
+						<span class="loading loading-spinner loading-sm"></span>
+						Mengirim...
+					{:else}
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+						</svg>
+						Kirim
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop" on:submit|preventDefault={closeUploadConfirmModal}>
+			<button>close</button>
 		</form>
 	</div>
 {/if}

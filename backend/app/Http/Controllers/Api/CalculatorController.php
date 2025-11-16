@@ -12,6 +12,7 @@ class CalculatorController extends Controller
 {
     /**
      * Calculate PPh21 (standalone calculator)
+     * Supports both old format (bruto, biaya_jabatan, iuran_pensiun, zakat) and new format (earnings, deductions)
      */
     public function calculatePph21(Request $request)
     {
@@ -28,50 +29,170 @@ class CalculatorController extends Controller
         }
         $request->merge($input);
 
-        $validated = $request->validate([
-            'ptkp_code' => 'required|string|in:TK0,TK1,TK2,TK3,K0,K1,K2,K3',
-            'bruto' => 'required|numeric|min:0',
-            'biaya_jabatan' => 'nullable|numeric|min:0',
-            'iuran_pensiun' => 'nullable|numeric|min:0',
-            'zakat' => 'nullable|numeric|min:0',
-            'month' => 'nullable|integer|min:1|max:12',
-            'has_npwp' => 'nullable|boolean',
-        ]);
+        // Check if using new format (earnings and deductions arrays)
+        $isNewFormat = $request->has('earnings') || $request->has('deductions');
 
-        $calculator = new PPh21CalculatorService();
+        if ($isNewFormat) {
+            // New format: earnings and deductions arrays
+            $validated = $request->validate([
+                'ptkp_code' => 'required|string|in:TK0,TK1,TK2,TK3,K0,K1,K2,K3',
+                'earnings' => 'required|array|min:1',
+                'earnings.*.component_id' => 'required|exists:components,id',
+                'earnings.*.amount' => 'required|numeric|min:0',
+                'deductions' => 'nullable|array',
+                'deductions.*.deduction_component_id' => 'required|exists:deduction_components,id',
+                'deductions.*.amount' => 'required|numeric|min:0',
+                'month' => 'nullable|integer|min:1|max:12',
+                'has_npwp' => 'nullable|boolean',
+            ]);
 
-        try {
-            // Defensive casting: Ensure all numeric values are properly cast to float
-            // This handles cases where values come as strings (e.g., "1.500.000" from formatted inputs)
-            $bruto = (float) $validated['bruto'];
-            $biayaJabatan = isset($validated['biaya_jabatan']) && $validated['biaya_jabatan'] !== null ? (float) $validated['biaya_jabatan'] : null;
-            $iuranPensiun = isset($validated['iuran_pensiun']) && $validated['iuran_pensiun'] !== null ? (float) $validated['iuran_pensiun'] : null;
-            
-            // Safe zakat casting: treat null, empty, or missing as 0
-            $zakat = 0.0;
-            if (isset($validated['zakat']) && $validated['zakat'] !== null && $validated['zakat'] !== '') {
-                $zakat = (float) $validated['zakat'];
+            $calculator = new PPh21CalculatorService();
+
+            try {
+                // Load components and deduction components
+                $componentIds = collect($validated['earnings'])->pluck('component_id')->unique();
+                $components = \App\Models\Component::whereIn('id', $componentIds)->get()->keyBy('id');
+                
+                $deductionComponentIds = collect($validated['deductions'] ?? [])->pluck('deduction_component_id')->unique();
+                $deductionComponents = \App\Models\DeductionComponent::whereIn('id', $deductionComponentIds)->get()->keyBy('id');
+
+                // Calculate bruto from taxable earnings
+                $bruto = 0;
+                foreach ($validated['earnings'] as $earning) {
+                    $component = $components->get($earning['component_id']);
+                    if ($component && $component->taxable) {
+                        $bruto += (float) $earning['amount'];
+                    }
+                }
+
+                // Calculate deductions from deduction components
+                $biayaJabatan = null;
+                $iuranPensiun = null;
+                $zakat = 0.0;
+                $otherTaxDeductibleDeductions = 0.0;
+
+                foreach ($validated['deductions'] ?? [] as $deduction) {
+                    $deductionComponent = $deductionComponents->get($deduction['deduction_component_id']);
+                    if (!$deductionComponent) {
+                        continue;
+                    }
+
+                    $amount = (float) $deduction['amount'];
+
+                    // Identify special deductions
+                    $isBiayaJabatan = $deductionComponent->code === 'biaya_jabatan' 
+                        || (str_contains(strtolower($deductionComponent->name), 'biaya jabatan')
+                            && $deductionComponent->calculation_type === 'auto');
+                    
+                    $isIuranPensiun = $deductionComponent->code === 'iuran_pensiun'
+                        || (str_contains(strtolower($deductionComponent->name), 'iuran pensiun')
+                        || ($deductionComponent->type === 'mandatory' && $deductionComponent->calculation_type === 'auto'));
+                    
+                    $isZakat = $deductionComponent->code === 'zakat'
+                        || str_contains(strtolower($deductionComponent->name), 'zakat');
+
+                    if ($isBiayaJabatan) {
+                        $biayaJabatan = $amount;
+                    } elseif ($isIuranPensiun) {
+                        $iuranPensiun = $amount;
+                    } elseif ($isZakat) {
+                        $zakat = $amount;
+                    } elseif ($deductionComponent->is_tax_deductible) {
+                        // Other tax-deductible deductions
+                        $otherTaxDeductibleDeductions += $amount;
+                    }
+                }
+
+                // Auto-calculate biaya_jabatan and iuran_pensiun if not provided and calculation_type is auto
+                if ($biayaJabatan === null) {
+                    $biayaJabatanComponent = $deductionComponents->first(function ($dc) {
+                        return $dc->code === 'biaya_jabatan' 
+                            || (str_contains(strtolower($dc->name), 'biaya jabatan') && $dc->calculation_type === 'auto');
+                    });
+                    if ($biayaJabatanComponent) {
+                        // Will be calculated by calculateStandalone if null
+                        $biayaJabatan = null;
+                    }
+                }
+
+                if ($iuranPensiun === null) {
+                    $iuranPensiunComponent = $deductionComponents->first(function ($dc) {
+                        return $dc->code === 'iuran_pensiun'
+                            || (str_contains(strtolower($dc->name), 'iuran pensiun') && $dc->calculation_type === 'auto');
+                    });
+                    if ($iuranPensiunComponent) {
+                        // Will be calculated by calculateStandalone if null
+                        $iuranPensiun = null;
+                    }
+                }
+
+                // Ensure zakat is never negative
+                $zakat = max(0.0, $zakat);
+
+                $result = $calculator->calculateStandalone(
+                    ptkpCode: $validated['ptkp_code'],
+                    bruto: $bruto,
+                    biayaJabatan: $biayaJabatan,
+                    iuranPensiun: $iuranPensiun,
+                    zakat: $zakat,
+                    month: $validated['month'] ?? 11,
+                    hasNpwp: $validated['has_npwp'] ?? true
+                );
+
+                return response()->json($result);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Calculation failed',
+                    'error' => $e->getMessage(),
+                ], 422);
             }
-            
-            // CRITICAL: Ensure zakat is never negative - default to 0 if invalid
-            $zakat = max(0.0, $zakat);
+        } else {
+            // Old format: bruto, biaya_jabatan, iuran_pensiun, zakat (backward compatibility)
+            $validated = $request->validate([
+                'ptkp_code' => 'required|string|in:TK0,TK1,TK2,TK3,K0,K1,K2,K3',
+                'bruto' => 'required|numeric|min:0',
+                'biaya_jabatan' => 'nullable|numeric|min:0',
+                'iuran_pensiun' => 'nullable|numeric|min:0',
+                'zakat' => 'nullable|numeric|min:0',
+                'month' => 'nullable|integer|min:1|max:12',
+                'has_npwp' => 'nullable|boolean',
+            ]);
 
-            $result = $calculator->calculateStandalone(
-                ptkpCode: $validated['ptkp_code'],
-                bruto: $bruto,
-                biayaJabatan: $biayaJabatan,
-                iuranPensiun: $iuranPensiun,
-                zakat: $zakat,
-                month: $validated['month'] ?? 11,
-                hasNpwp: $validated['has_npwp'] ?? true
-            );
+            $calculator = new PPh21CalculatorService();
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Calculation failed',
-                'error' => $e->getMessage(),
-            ], 422);
+            try {
+                // Defensive casting: Ensure all numeric values are properly cast to float
+                // This handles cases where values come as strings (e.g., "1.500.000" from formatted inputs)
+                $bruto = (float) $validated['bruto'];
+                $biayaJabatan = isset($validated['biaya_jabatan']) && $validated['biaya_jabatan'] !== null ? (float) $validated['biaya_jabatan'] : null;
+                $iuranPensiun = isset($validated['iuran_pensiun']) && $validated['iuran_pensiun'] !== null ? (float) $validated['iuran_pensiun'] : null;
+                
+                // Safe zakat casting: treat null, empty, or missing as 0
+                $zakat = 0.0;
+                if (isset($validated['zakat']) && $validated['zakat'] !== null && $validated['zakat'] !== '') {
+                    $zakat = (float) $validated['zakat'];
+                }
+                
+                // CRITICAL: Ensure zakat is never negative - default to 0 if invalid
+                $zakat = max(0.0, $zakat);
+
+                $result = $calculator->calculateStandalone(
+                    ptkpCode: $validated['ptkp_code'],
+                    bruto: $bruto,
+                    biayaJabatan: $biayaJabatan,
+                    iuranPensiun: $iuranPensiun,
+                    zakat: $zakat,
+                    month: $validated['month'] ?? 11,
+                    hasNpwp: $validated['has_npwp'] ?? true
+                );
+
+                return response()->json($result);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'message' => 'Calculation failed',
+                    'error' => $e->getMessage(),
+                ], 422);
+            }
         }
     }
 
@@ -83,32 +204,51 @@ class CalculatorController extends Controller
         $tenantId = $request->input('tenant_id') 
             ?? (app()->bound('tenant_id') ? app('tenant_id') : null);
 
-        // Normalize empty strings to null for optional numeric fields before validation
-        $input = $request->all();
-        if (isset($input['calculations']) && is_array($input['calculations'])) {
-            foreach ($input['calculations'] as $key => $calc) {
-                if (isset($calc['zakat']) && $calc['zakat'] === '') {
-                    $input['calculations'][$key]['zakat'] = null;
-                }
-                if (isset($calc['biaya_jabatan']) && $calc['biaya_jabatan'] === '') {
-                    $input['calculations'][$key]['biaya_jabatan'] = null;
-                }
-                if (isset($calc['iuran_pensiun']) && $calc['iuran_pensiun'] === '') {
-                    $input['calculations'][$key]['iuran_pensiun'] = null;
+        // Check if using new format (earnings and deductions arrays)
+        $isNewFormat = isset($request->input('calculations')[0]['earnings']) || isset($request->input('calculations')[0]['deductions']);
+
+        if ($isNewFormat) {
+            // New format: earnings and deductions arrays
+            $validated = $request->validate([
+                'calculations' => 'required|array|min:1',
+                'calculations.*.employment_id' => 'required|exists:employments,id',
+                'calculations.*.earnings' => 'required|array|min:1',
+                'calculations.*.earnings.*.component_id' => 'required|exists:components,id',
+                'calculations.*.earnings.*.amount' => 'required|numeric|min:0',
+                'calculations.*.deductions' => 'nullable|array',
+                'calculations.*.deductions.*.deduction_component_id' => 'required|exists:deduction_components,id',
+                'calculations.*.deductions.*.amount' => 'required|numeric|min:0',
+                'month' => 'nullable|integer|min:1|max:12',
+            ]);
+        } else {
+            // Old format: bruto, biaya_jabatan, iuran_pensiun, zakat (backward compatibility)
+            // Normalize empty strings to null for optional numeric fields before validation
+            $input = $request->all();
+            if (isset($input['calculations']) && is_array($input['calculations'])) {
+                foreach ($input['calculations'] as $key => $calc) {
+                    if (isset($calc['zakat']) && $calc['zakat'] === '') {
+                        $input['calculations'][$key]['zakat'] = null;
+                    }
+                    if (isset($calc['biaya_jabatan']) && $calc['biaya_jabatan'] === '') {
+                        $input['calculations'][$key]['biaya_jabatan'] = null;
+                    }
+                    if (isset($calc['iuran_pensiun']) && $calc['iuran_pensiun'] === '') {
+                        $input['calculations'][$key]['iuran_pensiun'] = null;
+                    }
                 }
             }
-        }
-        $request->merge($input);
+            $request->merge($input);
 
-        $validated = $request->validate([
-            'calculations' => 'required|array|min:1',
-            'calculations.*.employment_id' => 'required|exists:employments,id',
-            'calculations.*.bruto' => 'required|numeric|min:0',
-            'calculations.*.biaya_jabatan' => 'nullable|numeric|min:0',
-            'calculations.*.iuran_pensiun' => 'nullable|numeric|min:0',
-            'calculations.*.zakat' => 'nullable|numeric|min:0',
-            'month' => 'nullable|integer|min:1|max:12',
-        ]);
+            $validated = $request->validate([
+                'calculations' => 'required|array|min:1',
+                'calculations.*.employment_id' => 'required|exists:employments,id',
+                'calculations.*.bruto' => 'required|numeric|min:0',
+                'calculations.*.biaya_jabatan' => 'nullable|numeric|min:0',
+                'calculations.*.iuran_pensiun' => 'nullable|numeric|min:0',
+                'calculations.*.zakat' => 'nullable|numeric|min:0',
+                'month' => 'nullable|integer|min:1|max:12',
+            ]);
+        }
 
         $month = $validated['month'] ?? 11;
         $calculator = new PPh21CalculatorService();
@@ -132,24 +272,105 @@ class CalculatorController extends Controller
             $hasNpwp = $payrollSubject?->has_npwp ?? true;
 
             try {
-                // Safe casting for optional fields
-                $biayaJabatan = isset($calcData['biaya_jabatan']) && $calcData['biaya_jabatan'] !== null && $calcData['biaya_jabatan'] !== '' 
-                    ? (float) $calcData['biaya_jabatan'] 
-                    : null;
-                $iuranPensiun = isset($calcData['iuran_pensiun']) && $calcData['iuran_pensiun'] !== null && $calcData['iuran_pensiun'] !== '' 
-                    ? (float) $calcData['iuran_pensiun'] 
-                    : null;
-                
-                // Safe zakat casting: treat null, empty, or missing as 0
-                $zakat = 0.0;
-                if (isset($calcData['zakat']) && $calcData['zakat'] !== null && $calcData['zakat'] !== '') {
-                    $zakat = (float) $calcData['zakat'];
+                if ($isNewFormat) {
+                    // New format: process earnings and deductions arrays
+                    // Load components and deduction components
+                    $componentIds = collect($calcData['earnings'])->pluck('component_id')->unique();
+                    $components = \App\Models\Component::whereIn('id', $componentIds)->get()->keyBy('id');
+                    
+                    $deductionComponentIds = collect($calcData['deductions'] ?? [])->pluck('deduction_component_id')->unique();
+                    $deductionComponents = \App\Models\DeductionComponent::whereIn('id', $deductionComponentIds)->get()->keyBy('id');
+
+                    // Calculate bruto from taxable earnings
+                    $bruto = 0;
+                    foreach ($calcData['earnings'] as $earning) {
+                        $component = $components->get($earning['component_id']);
+                        if ($component && $component->taxable) {
+                            $bruto += (float) $earning['amount'];
+                        }
+                    }
+
+                    // Calculate deductions from deduction components
+                    $biayaJabatan = null;
+                    $iuranPensiun = null;
+                    $zakat = 0.0;
+
+                    foreach ($calcData['deductions'] ?? [] as $deduction) {
+                        $deductionComponent = $deductionComponents->get($deduction['deduction_component_id']);
+                        if (!$deductionComponent) {
+                            continue;
+                        }
+
+                        $amount = (float) $deduction['amount'];
+
+                        // Identify special deductions
+                        $isBiayaJabatan = $deductionComponent->code === 'biaya_jabatan' 
+                            || (str_contains(strtolower($deductionComponent->name), 'biaya jabatan')
+                                && $deductionComponent->calculation_type === 'auto');
+                        
+                        $isIuranPensiun = $deductionComponent->code === 'iuran_pensiun'
+                            || (str_contains(strtolower($deductionComponent->name), 'iuran pensiun')
+                            || ($deductionComponent->type === 'mandatory' && $deductionComponent->calculation_type === 'auto'));
+                        
+                        $isZakat = $deductionComponent->code === 'zakat'
+                            || str_contains(strtolower($deductionComponent->name), 'zakat');
+
+                        if ($isBiayaJabatan) {
+                            $biayaJabatan = $amount;
+                        } elseif ($isIuranPensiun) {
+                            $iuranPensiun = $amount;
+                        } elseif ($isZakat) {
+                            $zakat = $amount;
+                        }
+                    }
+
+                    // Auto-calculate biaya_jabatan and iuran_pensiun if not provided
+                    if ($biayaJabatan === null) {
+                        $biayaJabatanComponent = $deductionComponents->first(function ($dc) {
+                            return $dc->code === 'biaya_jabatan' 
+                                || (str_contains(strtolower($dc->name), 'biaya jabatan') && $dc->calculation_type === 'auto');
+                        });
+                        if ($biayaJabatanComponent) {
+                            // Will be calculated by calculateStandalone if null
+                            $biayaJabatan = null;
+                        }
+                    }
+
+                    if ($iuranPensiun === null) {
+                        $iuranPensiunComponent = $deductionComponents->first(function ($dc) {
+                            return $dc->code === 'iuran_pensiun'
+                                || (str_contains(strtolower($dc->name), 'iuran pensiun') && $dc->calculation_type === 'auto');
+                        });
+                        if ($iuranPensiunComponent) {
+                            // Will be calculated by calculateStandalone if null
+                            $iuranPensiun = null;
+                        }
+                    }
+
+                    // Ensure zakat is never negative
+                    $zakat = max(0.0, $zakat);
+                } else {
+                    // Old format: use bruto, biaya_jabatan, iuran_pensiun, zakat
+                    // Safe casting for optional fields
+                    $biayaJabatan = isset($calcData['biaya_jabatan']) && $calcData['biaya_jabatan'] !== null && $calcData['biaya_jabatan'] !== '' 
+                        ? (float) $calcData['biaya_jabatan'] 
+                        : null;
+                    $iuranPensiun = isset($calcData['iuran_pensiun']) && $calcData['iuran_pensiun'] !== null && $calcData['iuran_pensiun'] !== '' 
+                        ? (float) $calcData['iuran_pensiun'] 
+                        : null;
+                    
+                    // Safe zakat casting: treat null, empty, or missing as 0
+                    $zakat = 0.0;
+                    if (isset($calcData['zakat']) && $calcData['zakat'] !== null && $calcData['zakat'] !== '') {
+                        $zakat = (float) $calcData['zakat'];
+                    }
+                    $zakat = max(0.0, $zakat);
+                    $bruto = (float) $calcData['bruto'];
                 }
-                $zakat = max(0.0, $zakat);
 
                 $result = $calculator->calculateStandalone(
                     ptkpCode: $ptkpCode,
-                    bruto: (float) $calcData['bruto'],
+                    bruto: $bruto,
                     biayaJabatan: $biayaJabatan,
                     iuranPensiun: $iuranPensiun,
                     zakat: $zakat,

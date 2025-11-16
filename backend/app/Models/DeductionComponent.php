@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Component extends Model
+class DeductionComponent extends Model
 {
     use HasTenantScope, LogsActivity;
 
@@ -16,9 +16,9 @@ class Component extends Model
         'tenant_id',
         'code',
         'name',
-        'group',
-        'taxable',
-        'is_mandatory',
+        'type',
+        'calculation_type',
+        'is_tax_deductible',
         'priority',
         'is_active',
         'notes',
@@ -27,8 +27,7 @@ class Component extends Model
     protected function casts(): array
     {
         return [
-            'taxable' => 'boolean',
-            'is_mandatory' => 'boolean',
+            'is_tax_deductible' => 'boolean',
             'priority' => 'integer',
             'is_active' => 'boolean',
         ];
@@ -43,10 +42,10 @@ class Component extends Model
     }
 
     /**
-     * Get earnings using this component
+     * Get deductions using this component
      */
-    public function earnings(): HasMany
+    public function deductions(): HasMany
     {
-        return $this->hasMany(Earning::class);
+        return $this->hasMany(DeductionsManual::class);
     }
 }

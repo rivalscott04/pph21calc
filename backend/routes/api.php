@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalculatorController;
 use App\Http\Controllers\Api\ComponentController;
 use App\Http\Controllers\Api\ConfigController;
+use App\Http\Controllers\Api\DeductionComponentController;
 use App\Http\Controllers\Api\CoreTaxController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\EmploymentController;
@@ -33,6 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/{id}/users', [TenantController::class, 'createUser']);
     });
 
+    // Tenant admin routes (for managing users in their own tenant)
+    Route::middleware(['tenant.scope'])->group(function () {
+        Route::get('/my-tenant/users', [TenantController::class, 'listMyTenantUsers']);
+        Route::post('/my-tenant/users', [TenantController::class, 'createUserInMyTenant']);
+    });
+
     // Config routes (with tenant scope)
     Route::middleware(['tenant.scope'])->prefix('config')->group(function () {
         // Modules
@@ -59,6 +66,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/persons', [PersonController::class, 'store']);
         Route::get('/persons/resolve', [PersonController::class, 'resolve']);
         Route::get('/persons/{id}', [PersonController::class, 'show']);
+        Route::patch('/persons/{id}', [PersonController::class, 'update']);
         Route::post('/persons/{id}/identifiers', [PersonController::class, 'addIdentifier']);
 
         // Org Units
@@ -73,6 +81,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/components', [ComponentController::class, 'store']);
         Route::get('/components/{id}', [ComponentController::class, 'show']);
         Route::patch('/components/{id}', [ComponentController::class, 'update']);
+
+        // Deduction Components
+        Route::get('/deduction-components', [DeductionComponentController::class, 'index']);
+        Route::post('/deduction-components', [DeductionComponentController::class, 'store']);
+        Route::get('/deduction-components/{id}', [DeductionComponentController::class, 'show']);
+        Route::patch('/deduction-components/{id}', [DeductionComponentController::class, 'update']);
+        Route::delete('/deduction-components/{id}', [DeductionComponentController::class, 'destroy']);
 
         // Employments
         Route::get('/employments', [EmploymentController::class, 'index']);

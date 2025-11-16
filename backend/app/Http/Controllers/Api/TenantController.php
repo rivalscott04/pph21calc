@@ -182,4 +182,113 @@ class TenantController extends Controller
             'tenant_user' => $tenantUser->load('user', 'tenant'),
         ], 201);
     }
+
+    /**
+     * Create user in current tenant (Tenant Admin only)
+     */
+    public function createUserInMyTenant(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+                'error' => 'UNAUTHORIZED'
+            ], 401);
+        }
+
+        // Get user's tenant
+        $tenantUser = $user->tenantUsers()->where('status', 'active')->first();
+        
+        if (!$tenantUser) {
+            return response()->json([
+                'message' => 'User does not have an active tenant',
+                'error' => 'TENANT_REQUIRED'
+            ], 403);
+        }
+
+        $tenant = $tenantUser->tenant;
+        $role = $tenantUser->role;
+
+        // Only TENANT_ADMIN can create users
+        if ($role !== 'TENANT_ADMIN' && !$user->isSuperadmin()) {
+            return response()->json([
+                'message' => 'Only tenant admin can create users',
+                'error' => 'UNAUTHORIZED'
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'role' => 'required|string|in:TENANT_ADMIN,HR,FINANCE,VIEWER',
+            'status' => 'nullable|string|in:active,inactive',
+        ]);
+
+        // Create user
+        $newUser = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'is_superadmin' => false,
+            'status' => $validated['status'] ?? 'active',
+        ]);
+
+        // Create tenant user relationship
+        $newTenantUser = TenantUser::create([
+            'user_id' => $newUser->id,
+            'tenant_id' => $tenant->id,
+            'role' => $validated['role'],
+            'status' => $validated['status'] ?? 'active',
+        ]);
+
+        return response()->json([
+            'user' => $newUser,
+            'tenant_user' => $newTenantUser->load('user', 'tenant'),
+        ], 201);
+    }
+
+    /**
+     * List users in current tenant (Tenant Admin only)
+     */
+    public function listMyTenantUsers(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized',
+                'error' => 'UNAUTHORIZED'
+            ], 401);
+        }
+
+        // Get user's tenant
+        $tenantUser = $user->tenantUsers()->where('status', 'active')->first();
+        
+        if (!$tenantUser) {
+            return response()->json([
+                'message' => 'User does not have an active tenant',
+                'error' => 'TENANT_REQUIRED'
+            ], 403);
+        }
+
+        $tenant = $tenantUser->tenant;
+        $role = $tenantUser->role;
+
+        // Only TENANT_ADMIN can list users (or superadmin)
+        if ($role !== 'TENANT_ADMIN' && !$user->isSuperadmin()) {
+            return response()->json([
+                'message' => 'Only tenant admin can list users',
+                'error' => 'UNAUTHORIZED'
+            ], 403);
+        }
+
+        $tenantUsers = TenantUser::where('tenant_id', $tenant->id)
+            ->with('user')
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->input('per_page', 15));
+
+        return response()->json($tenantUsers);
+    }
 }

@@ -69,6 +69,9 @@ class ComponentController extends Controller
             'name' => 'required|string|max:255',
             'group' => 'required|string|in:gaji_pokok,tunjangan,bonus,lembur,natura,lainnya',
             'taxable' => 'required|boolean',
+            'is_mandatory' => 'nullable|boolean',
+            'priority' => 'nullable|integer|min:0',
+            'is_active' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
 
@@ -78,6 +81,9 @@ class ComponentController extends Controller
             'name' => $validated['name'],
             'group' => $validated['group'],
             'taxable' => $validated['taxable'],
+            'is_mandatory' => $validated['is_mandatory'] ?? false,
+            'priority' => $validated['priority'] ?? 0,
+            'is_active' => $validated['is_active'] ?? true,
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -103,6 +109,9 @@ class ComponentController extends Controller
             'name' => 'sometimes|string|max:255',
             'group' => 'sometimes|string|in:gaji_pokok,tunjangan,bonus,lembur,natura,lainnya',
             'taxable' => 'sometimes|boolean',
+            'is_mandatory' => 'nullable|boolean',
+            'priority' => 'nullable|integer|min:0',
+            'is_active' => 'nullable|boolean',
             'notes' => 'nullable|string',
         ]);
 

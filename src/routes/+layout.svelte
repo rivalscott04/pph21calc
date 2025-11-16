@@ -24,6 +24,10 @@
 		// Initialize brand theme - use setTimeout to avoid blocking
 		setTimeout(async () => {
 			try {
+				const { watchTenantAndReloadTheme, initBrandTheme } = await import('$lib/stores/brand.js');
+				// Watch for tenant changes and reload theme
+				watchTenantAndReloadTheme();
+				// Initial load
 				await initBrandTheme();
 			} catch (error) {
 				console.error('Theme initialization error:', error);

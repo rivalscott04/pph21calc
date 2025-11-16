@@ -56,6 +56,21 @@ export const tenantsApi = {
 		role: string;
 	}): Promise<TenantUser> {
 		return await apiPost<TenantUser>(`/tenants/${tenantId}/users`, user);
+	},
+	
+	// Tenant admin methods (for managing users in their own tenant)
+	async listMyTenantUsers(): Promise<PaginatedResponse<TenantUser>> {
+		return await apiGet<PaginatedResponse<TenantUser>>('/my-tenant/users');
+	},
+	
+	async createUserInMyTenant(user: {
+		name: string;
+		email: string;
+		password: string;
+		role: string;
+		status?: 'active' | 'inactive';
+	}): Promise<{ user: User; tenant_user: TenantUser }> {
+		return await apiPost<{ user: User; tenant_user: TenantUser }>('/my-tenant/users', user);
 	}
 };
 

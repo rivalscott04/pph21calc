@@ -8,6 +8,9 @@ export interface Component {
 	name: string;
 	group: 'gaji_pokok' | 'tunjangan' | 'bonus' | 'lembur' | 'natura' | 'lainnya';
 	taxable: boolean;
+	is_mandatory?: boolean;
+	priority?: number;
+	is_active?: boolean;
 	notes?: string | null;
 	created_at: string;
 	updated_at: string;
@@ -31,6 +34,9 @@ export const componentsApi = {
 		name: string;
 		group: string;
 		taxable: boolean;
+		is_mandatory?: boolean;
+		priority?: number;
+		is_active?: boolean;
 		notes?: string;
 	}): Promise<Component> {
 		return await apiPost<Component>('/components', component);
@@ -41,6 +47,9 @@ export const componentsApi = {
 		name: string;
 		group: string;
 		taxable: boolean;
+		is_mandatory?: boolean;
+		priority?: number;
+		is_active?: boolean;
 		notes?: string;
 	}>): Promise<Component> {
 		return await apiPatch<Component>(`/components/${id}`, component);

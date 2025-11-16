@@ -12,6 +12,7 @@
 	let showPreview = false;
 	let previewLoading = false;
 	let commitLoading = false;
+	let showCommitConfirmModal = false;
 	
 	// Pagination for calculations table
 	let currentPage = 1;
@@ -119,12 +120,19 @@
 		}
 	}
 
-	async function commitPayroll() {
+	function openCommitConfirmModal() {
 		if (!selectedPeriod) return;
-		if (!confirm('Apakah Anda yakin ingin commit payroll? Tindakan ini tidak dapat dibatalkan.')) {
-			return;
-		}
+		showCommitConfirmModal = true;
+	}
+
+	function closeCommitConfirmModal() {
+		showCommitConfirmModal = false;
+	}
+
+	async function confirmCommit() {
+		if (!selectedPeriod) return;
 		commitLoading = true;
+		closeCommitConfirmModal();
 		try {
 			await payrollApi.commit(selectedPeriod.id);
 			toast.success('Payroll berhasil di-commit');
@@ -176,7 +184,7 @@
 			<h1 class="text-3xl font-bold text-base-content">Payroll</h1>
 			<p class="text-base-content opacity-70 mt-1">Kelola payroll dan perhitungan PPh 21</p>
 		</div>
-		<button class="btn btn-success text-white" on:click={createPeriod}>
+		<button class="btn btn-brand text-white" on:click={createPeriod}>
 			<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
 			</svg>
@@ -231,7 +239,7 @@
 							{#if periods.length === 0}
 								<div class="text-center py-8 text-base-content opacity-50">
 									<p>Belum ada periode</p>
-									<button class="btn btn-sm btn-primary text-white mt-4" on:click={createPeriod}>
+									<button class="btn btn-sm btn-brand text-white mt-4" on:click={createPeriod}>
 										Buat Periode Pertama
 									</button>
 								</div>
@@ -266,7 +274,7 @@
 										{#if selectedPeriod.status !== 'posted'}
 											<a
 												href="/payroll/input?period={selectedPeriod.id}"
-												class="btn btn-primary btn-lg text-white shadow-md hover:shadow-lg transition-shadow"
+												class="btn btn-brand btn-lg text-white shadow-md hover:shadow-lg transition-shadow"
 											>
 												<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 													<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -305,7 +313,7 @@
 													<li>
 														<button
 															class="text-base-content hover:text-white"
-															on:click={commitPayroll}
+															on:click={openCommitConfirmModal}
 															disabled={commitLoading}
 														>
 															{#if commitLoading}
@@ -610,7 +618,7 @@
 							</svg>
 							<p class="text-base-content opacity-70 text-lg mb-2">Pilih periode untuk melihat detail</p>
 							<p class="text-base-content opacity-50 text-sm mb-6">Atau buat periode baru untuk memulai</p>
-							<button class="btn btn-primary text-white btn-lg" on:click={createPeriod}>
+							<button class="btn btn-brand text-white btn-lg" on:click={createPeriod}>
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
 								</svg>
@@ -623,3 +631,63 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Commit Confirmation Modal -->
+{#if showCommitConfirmModal}
+	<div class="modal modal-open">
+		<div class="modal-box">
+			<div class="flex items-center gap-4 mb-6">
+				<div class="flex-shrink-0">
+					<div class="w-12 h-12 rounded-full bg-error/20 flex items-center justify-center">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+					</div>
+				</div>
+				<div class="flex-1">
+					<h3 class="text-2xl font-bold text-base-content mb-1">Commit Payroll</h3>
+					<p class="text-sm text-base-content opacity-70">Tindakan ini tidak dapat dibatalkan</p>
+				</div>
+			</div>
+
+			<div class="bg-base-200 rounded-lg p-4 mb-6">
+				<p class="text-base-content mb-2">
+					Apakah Anda yakin ingin commit payroll?
+				</p>
+				<p class="text-sm text-base-content opacity-70">
+					Tindakan ini tidak dapat dibatalkan setelah dilakukan.
+				</p>
+				{#if selectedPeriod}
+					<p class="text-sm text-base-content opacity-70 mt-2">
+						Periode: <span class="font-semibold">
+							{new Date(selectedPeriod.year, selectedPeriod.month - 1).toLocaleString('id-ID', {
+								month: 'long',
+								year: 'numeric'
+							})}
+						</span>
+					</p>
+				{/if}
+			</div>
+
+			<div class="modal-action">
+				<button class="btn btn-outline btn-neutral text-base-content" on:click={closeCommitConfirmModal} disabled={commitLoading}>
+					Batal
+				</button>
+				<button class="btn btn-error text-white" on:click={confirmCommit} disabled={commitLoading}>
+					{#if commitLoading}
+						<span class="loading loading-spinner loading-sm"></span>
+						Memproses...
+					{:else}
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+						</svg>
+						Commit
+					{/if}
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop" on:submit|preventDefault={closeCommitConfirmModal}>
+			<button>close</button>
+		</form>
+	</div>
+{/if}

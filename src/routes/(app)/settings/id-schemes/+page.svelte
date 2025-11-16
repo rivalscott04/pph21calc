@@ -10,18 +10,17 @@
 	let showModal = false;
 	let editingScheme: IdentifierScheme | null = null;
 	let saving = false;
+	let showDeleteModal = false;
+	let schemeToDelete: IdentifierScheme | null = null;
 
 	// Form state
 	let formData = {
 		code: '',
 		label: '',
-		entity_type: '',
-		regex_pattern: '',
+		prefix: '', // Prefix untuk ID (contoh: "NTB")
+		format_type: 'NUMERIC', // NUMERIC atau ALPHANUMERIC
 		length_min: '',
-		length_max: '',
-		normalize_rule: 'NONE',
-		example: '',
-		checksum_type: 'NONE'
+		length_max: ''
 	};
 
 	// Form errors
@@ -43,24 +42,16 @@ let codeInputWarning = '';
 		{ value: 'UPPER', label: 'Huruf besar' }
 	];
 
-	const checksumTypes = [
-		{ value: 'NONE', label: 'Tidak ada checksum' },
-		{ value: 'LUHN', label: 'Luhn algorithm' },
-		{ value: 'MOD_N', label: 'Mod N' }
-	];
 
 	function openCreateModal() {
 		editingScheme = null;
 		formData = {
 			code: '',
 			label: '',
-			entity_type: '',
-			regex_pattern: '',
+			prefix: '',
+			format_type: 'NUMERIC',
 			length_min: '',
-			length_max: '',
-			normalize_rule: 'NONE',
-			example: '',
-			checksum_type: 'NONE'
+			length_max: ''
 		};
 		formErrors = {};
 		codeInputWarning = '';
@@ -69,16 +60,20 @@ let codeInputWarning = '';
 
 	function openEditModal(scheme: IdentifierScheme) {
 		editingScheme = scheme;
+		
+		// Detect format type from normalize rule
+		let formatType = 'NUMERIC';
+		if (scheme.normalize_rule === 'ALNUM') {
+			formatType = 'ALPHANUMERIC';
+		}
+		
 		formData = {
 			code: scheme.code,
 			label: scheme.label,
-			entity_type: scheme.entity_type || '',
-			regex_pattern: scheme.regex_pattern || '',
+			prefix: scheme.prefix || '',
+			format_type: formatType,
 			length_min: scheme.length_min?.toString() || '',
-			length_max: scheme.length_max?.toString() || '',
-			normalize_rule: scheme.normalize_rule || 'NONE',
-			example: scheme.example || '',
-			checksum_type: scheme.checksum_type || 'NONE'
+			length_max: scheme.length_max?.toString() || ''
 		};
 		formErrors = {};
 		codeInputWarning = '';
@@ -91,13 +86,10 @@ let codeInputWarning = '';
 		formData = {
 			code: '',
 			label: '',
-			entity_type: '',
-			regex_pattern: '',
+			prefix: '',
+			format_type: 'NUMERIC',
 			length_min: '',
-			length_max: '',
-			normalize_rule: 'NONE',
-			example: '',
-			checksum_type: 'NONE'
+			length_max: ''
 		};
 		formErrors = {};
 		codeInputWarning = '';
@@ -116,27 +108,72 @@ let codeInputWarning = '';
 			formErrors.label = 'Label wajib diisi';
 		}
 
-		if (formData.regex_pattern && !isValidRegex(formData.regex_pattern)) {
-			formErrors.regex_pattern = 'Pattern regex tidak valid';
+		if (!formData.prefix.trim()) {
+			formErrors.prefix = 'Prefix wajib diisi';
+		} else if (!/^[A-Z0-9]+$/.test(formData.prefix.toUpperCase())) {
+			formErrors.prefix = 'Prefix hanya boleh huruf dan angka';
 		}
 
-		if (formData.length_min && (!/^\d+$/.test(formData.length_min) || parseInt(formData.length_min) < 1)) {
-			formErrors.length_min = 'Panjang minimum harus angka positif';
-		}
-
-		if (formData.length_max && (!/^\d+$/.test(formData.length_max) || parseInt(formData.length_max) < 1)) {
-			formErrors.length_max = 'Panjang maksimum harus angka positif';
-		}
-
-		if (formData.length_min && formData.length_max) {
+		if (!formData.length_min || !formData.length_max) {
+			if (!formData.length_min) {
+				formErrors.length_min = 'Panjang minimum wajib diisi';
+			}
+			if (!formData.length_max) {
+				formErrors.length_max = 'Panjang maksimum wajib diisi';
+			}
+		} else {
 			const min = parseInt(formData.length_min);
 			const max = parseInt(formData.length_max);
-			if (min > max) {
-				formErrors.length_max = 'Panjang maksimum harus >= panjang minimum';
+			
+			if (isNaN(min) || min < 1) {
+				formErrors.length_min = 'Panjang minimum harus angka positif';
+			}
+			if (isNaN(max) || max < 1) {
+				formErrors.length_max = 'Panjang maksimum harus angka positif';
+			}
+			if (!isNaN(min) && !isNaN(max) && min > max) {
+				formErrors.length_max = 'Panjang maksimum harus lebih besar atau sama dengan panjang minimum';
 			}
 		}
 
 		return Object.keys(formErrors).length === 0;
+	}
+
+	function getFormatRegex(): string {
+		const min = formData.length_min ? parseInt(formData.length_min) : 1;
+		const max = formData.length_max ? parseInt(formData.length_max) : min;
+		
+		switch (formData.format_type) {
+			case 'NUMERIC':
+				return `^[0-9]{${min === max ? min : `${min},${max}`}}$`;
+			case 'ALPHANUMERIC':
+				return `^[A-Za-z0-9]{${min === max ? min : `${min},${max}`}}$`;
+			default:
+				return '';
+		}
+	}
+
+	function getNormalizeRule(): string {
+		switch (formData.format_type) {
+			case 'NUMERIC':
+				return 'NUMERIC';
+			case 'ALPHANUMERIC':
+				return 'ALNUM';
+			default:
+				return 'NONE';
+		}
+	}
+
+	function getExample(): string {
+		const min = formData.length_min ? parseInt(formData.length_min) : 8;
+		switch (formData.format_type) {
+			case 'NUMERIC':
+				return '1'.repeat(min);
+			case 'ALPHANUMERIC':
+				return 'A' + '1'.repeat(min - 1);
+			default:
+				return '';
+		}
 	}
 
 	function isValidRegex(pattern: string): boolean {
@@ -150,7 +187,13 @@ let codeInputWarning = '';
 
 	async function saveScheme() {
 		if (!validateForm()) {
-			toast.error('Mohon perbaiki error pada form');
+			// Get first error message for toast
+			const firstError = Object.values(formErrors)[0];
+			if (firstError) {
+				toast.error(firstError);
+			} else {
+				toast.error('Mohon perbaiki error pada form');
+			}
 			return;
 		}
 
@@ -159,17 +202,15 @@ let codeInputWarning = '';
 			const user = get(auth);
 			const tenantId = user?.tenant?.id;
 
-		const schemeData = {
+		// Kirim data sederhana, backend yang auto-generate
+		const schemeData: any = {
 			code: formData.code.trim().toUpperCase(),
 			label: formData.label.trim(),
-			entity_type: formData.entity_type.trim() || null,
-			regex_pattern: formData.regex_pattern.trim() || null,
-			length_min: formData.length_min ? parseInt(formData.length_min) : null,
-			length_max: formData.length_max ? parseInt(formData.length_max) : null,
-			normalize_rule: formData.normalize_rule || null,
-			example: formData.example.trim() || null,
-			checksum_type: formData.checksum_type || null
-		} as Omit<IdentifierScheme, 'id' | 'tenant_id'>;
+			prefix: formData.prefix.trim().toUpperCase(),
+			format_type: formData.format_type,
+			length_min: parseInt(formData.length_min),
+			length_max: parseInt(formData.length_max)
+		};
 
 		if (editingScheme) {
 			await configApi.updateIdentifierScheme(editingScheme.id, schemeData, tenantId);
@@ -185,24 +226,43 @@ let codeInputWarning = '';
 			console.error('Failed to save scheme:', error);
 			if (error.errors) {
 				formErrors = error.errors;
+				// Show first error in toast
+				const firstError = Object.values(error.errors)[0];
+				if (firstError && typeof firstError === 'string') {
+					toast.error(firstError);
+				} else if (Array.isArray(firstError) && firstError.length > 0) {
+					toast.error(firstError[0]);
+				} else {
+					toast.error('Mohon perbaiki error pada form');
+				}
 			} else {
-				toast.error(error.message || 'Gagal menyimpan skema ID');
+				const errorMsg = error.message || 'Gagal menyimpan skema ID';
+				toast.error(errorMsg);
 			}
 		} finally {
 			saving = false;
 		}
 	}
 
-	async function deleteScheme(scheme: IdentifierScheme) {
-		if (!confirm(`Yakin ingin menghapus skema "${scheme.label}"?`)) {
-			return;
-		}
+	function openDeleteModal(scheme: IdentifierScheme) {
+		schemeToDelete = scheme;
+		showDeleteModal = true;
+	}
+
+	function closeDeleteModal() {
+		showDeleteModal = false;
+		schemeToDelete = null;
+	}
+
+	async function confirmDelete() {
+		if (!schemeToDelete) return;
 
 		try {
 			const user = get(auth);
 			const tenantId = user?.tenant?.id;
-			await configApi.deleteIdentifierScheme(scheme.id, tenantId);
+			await configApi.deleteIdentifierScheme(schemeToDelete.id, tenantId);
 			toast.success('Skema ID berhasil dihapus');
+			closeDeleteModal();
 			await loadSchemes();
 		} catch (error) {
 			console.error('Failed to delete scheme:', error);
@@ -299,7 +359,7 @@ let codeInputWarning = '';
 												</button>
 												<button
 													class="btn btn-sm btn-ghost text-error"
-													on:click={() => deleteScheme(scheme)}
+													on:click={() => openDeleteModal(scheme)}
 													aria-label="Hapus skema"
 												>
 													<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -386,49 +446,57 @@ let codeInputWarning = '';
 					{/if}
 				</div>
 
-				<!-- Entity Type -->
+				<!-- Prefix -->
 				<div class="form-control">
 					<div class="label pb-1">
-						<span class="label-text font-semibold text-base-content">Tipe Entity</span>
+						<span class="label-text font-semibold text-base-content">Prefix ID <span class="text-error">*</span></span>
 					</div>
 					<input
 						type="text"
-						class="input input-bordered w-full text-base-content placeholder:text-base-content/50"
-						placeholder="BANK, BUMN, KAMPUS, dll"
-						bind:value={formData.entity_type}
+						class={`input input-bordered w-full text-base-content placeholder:text-base-content/50 ${formErrors.prefix ? 'input-error' : ''}`}
+						placeholder="NTB"
+						bind:value={formData.prefix}
+						on:input={(e) => {
+							const input = e.currentTarget as HTMLInputElement;
+							formData.prefix = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+						}}
 					/>
-					<div class="label pt-1 pb-0">
-						<span class="label-text-alt text-base-content opacity-50">Opsional: untuk grouping schemes</span>
-					</div>
-				</div>
-
-				<!-- Regex Pattern -->
-				<div class="form-control">
-					<div class="label pb-1">
-						<span class="label-text font-semibold text-base-content">Pattern Regex</span>
-					</div>
-					<input
-						type="text"
-						class={`input input-bordered w-full font-mono text-sm text-base-content placeholder:text-base-content/50 ${formErrors.regex_pattern ? 'input-error' : ''}`}
-						placeholder="^[0-9]{8}$"
-						bind:value={formData.regex_pattern}
-					/>
-					{#if formErrors.regex_pattern}
+					{#if formErrors.prefix}
 						<div class="label pt-1 pb-0">
-							<span class="label-text-alt text-error">{formErrors.regex_pattern}</span>
+							<span class="label-text-alt text-error">{formErrors.prefix}</span>
 						</div>
 					{:else}
 						<div class="label pt-1 pb-0">
-							<span class="label-text-alt text-base-content opacity-50">Contoh: ^[0-9]{8}$ untuk 8 digit angka</span>
+							<span class="label-text-alt text-base-content opacity-50">Prefix yang akan muncul READONLY saat input ID pegawai (contoh: NTB)</span>
 						</div>
 					{/if}
+				</div>
+
+				<!-- Format Type -->
+				<div class="form-control">
+					<div class="label pb-1">
+						<span class="label-text font-semibold text-base-content">Format ID <span class="text-error">*</span></span>
+					</div>
+					<select class="select select-bordered w-full" bind:value={formData.format_type}>
+						<option value="NUMERIC">Angka saja (0-9)</option>
+						<option value="ALPHANUMERIC">Huruf dan Angka (A-Z, 0-9)</option>
+					</select>
+					<div class="label pt-1 pb-0">
+						<span class="label-text-alt text-base-content opacity-50">
+							{#if formData.format_type === 'NUMERIC'}
+								Format: Hanya angka (contoh: 12345678)
+							{:else}
+								Format: Huruf dan angka (contoh: AB1234)
+							{/if}
+						</span>
+					</div>
 				</div>
 
 				<!-- Length Min/Max -->
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 					<div class="form-control">
 						<div class="label pb-1">
-							<span class="label-text font-semibold text-base-content">Panjang Minimum</span>
+							<span class="label-text font-semibold text-base-content">Panjang Minimum <span class="text-error">*</span></span>
 						</div>
 						<input
 							type="number"
@@ -436,6 +504,7 @@ let codeInputWarning = '';
 							placeholder="8"
 							bind:value={formData.length_min}
 							min="1"
+							required
 						/>
 						{#if formErrors.length_min}
 							<div class="label pt-1 pb-0">
@@ -445,7 +514,7 @@ let codeInputWarning = '';
 					</div>
 					<div class="form-control">
 						<div class="label pb-1">
-							<span class="label-text font-semibold text-base-content">Panjang Maksimum</span>
+							<span class="label-text font-semibold text-base-content">Panjang Maksimum <span class="text-error">*</span></span>
 						</div>
 						<input
 							type="number"
@@ -453,6 +522,7 @@ let codeInputWarning = '';
 							placeholder="8"
 							bind:value={formData.length_max}
 							min="1"
+							required
 						/>
 						{#if formErrors.length_max}
 							<div class="label pt-1 pb-0">
@@ -462,45 +532,6 @@ let codeInputWarning = '';
 					</div>
 				</div>
 
-				<!-- Normalize Rule -->
-				<div class="form-control">
-					<div class="label pb-1">
-						<span class="label-text font-semibold text-base-content">Aturan Normalisasi</span>
-					</div>
-					<select class="select select-bordered w-full text-base-content" bind:value={formData.normalize_rule}>
-						{#each normalizeRules as rule}
-							<option value={rule.value}>{rule.label}</option>
-						{/each}
-					</select>
-				</div>
-
-				<!-- Checksum Type -->
-				<div class="form-control">
-					<div class="label pb-1">
-						<span class="label-text font-semibold text-base-content">Tipe Checksum</span>
-					</div>
-					<select class="select select-bordered w-full text-base-content" bind:value={formData.checksum_type}>
-						{#each checksumTypes as type}
-							<option value={type.value}>{type.label}</option>
-						{/each}
-					</select>
-				</div>
-
-				<!-- Example -->
-				<div class="form-control">
-					<div class="label pb-1">
-						<span class="label-text font-semibold text-base-content">Contoh</span>
-					</div>
-					<input
-						type="text"
-						class="input input-bordered w-full font-mono text-sm text-base-content placeholder:text-base-content/50"
-						placeholder="00123456"
-						bind:value={formData.example}
-					/>
-					<div class="label pt-1 pb-0">
-						<span class="label-text-alt text-base-content opacity-50">Contoh ID yang valid sesuai skema ini</span>
-					</div>
-				</div>
 			</div>
 
 			<div class="modal-action mt-8 pt-6 border-t border-base-300">
@@ -518,6 +549,48 @@ let codeInputWarning = '';
 			</div>
 		</div>
 		<form method="dialog" class="modal-backdrop" on:submit|preventDefault={closeModal}>
+			<button>close</button>
+		</form>
+	</div>
+{/if}
+
+<!-- Delete Confirmation Modal -->
+{#if showDeleteModal && schemeToDelete}
+	<div class="modal modal-open">
+		<div class="modal-box">
+			<div class="flex items-center gap-4 mb-6">
+				<div class="flex-shrink-0">
+					<div class="w-12 h-12 rounded-full bg-error/20 flex items-center justify-center">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+						</svg>
+					</div>
+				</div>
+				<div class="flex-1">
+					<h3 class="text-2xl font-bold text-base-content mb-1">Hapus Skema ID</h3>
+					<p class="text-sm text-base-content opacity-70">Tindakan ini tidak dapat dibatalkan</p>
+				</div>
+			</div>
+
+			<div class="bg-base-200 rounded-lg p-4 mb-6">
+				<p class="text-base-content">
+					Yakin ingin menghapus skema <span class="font-semibold text-error">"{schemeToDelete.label}"</span>?
+				</p>
+			</div>
+
+			<div class="modal-action">
+				<button class="btn btn-outline btn-neutral text-base-content" on:click={closeDeleteModal}>
+					Batal
+				</button>
+				<button class="btn btn-error text-white" on:click={confirmDelete}>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+					</svg>
+					Hapus
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop" on:submit|preventDefault={closeDeleteModal}>
 			<button>close</button>
 		</form>
 	</div>

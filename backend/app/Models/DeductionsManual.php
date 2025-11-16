@@ -16,7 +16,8 @@ class DeductionsManual extends Model
         'tenant_id',
         'employment_id',
         'period_id',
-        'type',
+        'deduction_component_id',
+        'type', // Keep for backward compatibility during migration
         'amount',
     ];
 
@@ -49,5 +50,13 @@ class DeductionsManual extends Model
     public function period(): BelongsTo
     {
         return $this->belongsTo(Period::class);
+    }
+
+    /**
+     * Get the deduction component
+     */
+    public function deductionComponent(): BelongsTo
+    {
+        return $this->belongsTo(DeductionComponent::class);
     }
 }

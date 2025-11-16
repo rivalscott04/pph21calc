@@ -19,23 +19,28 @@ class DatabaseSeeder extends Seeder
         // Create superadmin
         $superadmin = User::create([
             'name' => 'Super Admin',
-            'email' => 'admin@pph21.local',
+            'email' => 'admin@tes.com',
             'password' => Hash::make('password'),
             'is_superadmin' => true,
             'status' => 'active',
         ]);
 
-        // Create tenant
+        $this->command->info('Superadmin created: admin@tes.com / password');
+
+        // Create tenant: Bank NTB Syariah
         $tenant = Tenant::create([
-            'code' => 'TEST001',
-            'name' => 'Test Company',
+            'code' => 'BNTB',
+            'name' => 'Bank NTB Syariah',
+            'npwp_pemotong' => null,
             'status' => 'active',
         ]);
 
-        // Create tenant admin
+        $this->command->info('Tenant created: Bank NTB Syariah (BNTB)');
+
+        // Create tenant admin for Bank NTB Syariah
         $tenantAdmin = User::create([
-            'name' => 'Tenant Admin',
-            'email' => 'admin@test.local',
+            'name' => 'Admin Bank NTB Syariah',
+            'email' => 'ntbs@mail.com',
             'password' => Hash::make('password'),
             'is_superadmin' => false,
             'status' => 'active',
@@ -48,20 +53,10 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // Create HR user
-        $hrUser = User::create([
-            'name' => 'HR User',
-            'email' => 'hr@test.local',
-            'password' => Hash::make('password'),
-            'is_superadmin' => false,
-            'status' => 'active',
-        ]);
-
-        TenantUser::create([
-            'user_id' => $hrUser->id,
-            'tenant_id' => $tenant->id,
-            'role' => 'HR',
-            'status' => 'active',
-        ]);
+        $this->command->info('Tenant Admin created: ntbs@mail.com / password');
+        $this->command->info('');
+        $this->command->info('=== Login Credentials ===');
+        $this->command->info('Superadmin: admin@tes.com / password');
+        $this->command->info('Tenant Admin: ntbs@mail.com / password');
     }
 }

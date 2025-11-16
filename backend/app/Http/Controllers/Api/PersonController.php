@@ -88,6 +88,30 @@ class PersonController extends Controller
     }
 
     /**
+     * Update person
+     */
+    public function update(Request $request, $id)
+    {
+        $person = Person::findOrFail($id);
+
+        $validated = $request->validate([
+            'full_name' => 'required|string|max:255',
+            'nik' => 'nullable|string|max:16',
+            'npwp' => 'nullable|string|max:15',
+            'birth_date' => 'nullable|date',
+        ]);
+
+        $person->update([
+            'full_name' => $validated['full_name'],
+            'nik' => $validated['nik'] ?? null,
+            'npwp' => $validated['npwp'] ?? null,
+            'birth_date' => $validated['birth_date'] ?? null,
+        ]);
+
+        return response()->json($person->load(['identifiers.scheme']));
+    }
+
+    /**
      * Resolve person by identifier (for search/lookup)
      */
     public function resolve(Request $request)
@@ -158,8 +182,12 @@ class PersonController extends Controller
         // Get scheme to normalize value
         $scheme = IdentifierScheme::findOrFail($validated['scheme_id']);
 
-        // Normalize value based on scheme rules
-        $normValue = $this->normalizeIdentifier($validated['raw_value'], $scheme);
+        // Normalize bagian belakang (input user) berdasarkan scheme rules
+        $normalizedSuffix = $this->normalizeIdentifier($validated['raw_value'], $scheme);
+        
+        // Gabungkan prefix + bagian belakang yang sudah dinormalisasi
+        $fullValue = ($scheme->prefix ?? '') . $normalizedSuffix;
+        $normValue = $fullValue;
 
         // Check uniqueness
         $exists = PersonIdentifier::where('tenant_id', $tenantId)
@@ -192,7 +220,7 @@ class PersonController extends Controller
             'tenant_id' => $tenantId,
             'person_id' => $person->id,
             'scheme_id' => $validated['scheme_id'],
-            'raw_value' => $validated['raw_value'],
+            'raw_value' => $fullValue, // Simpan full value (prefix + suffix)
             'norm_value' => $normValue,
             'scope_entity_id' => $validated['scope_entity_id'] ?? null,
             'scope_org_unit_id' => $validated['scope_org_unit_id'] ?? null,
