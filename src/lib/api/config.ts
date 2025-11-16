@@ -23,7 +23,13 @@ export interface ConfigBranding {
 	neutral: string;
 	base100: string;
 	button: string;
-	badge: string;
+	badge_success: string;
+	badge_error: string;
+	badge_primary: string;
+	badge_secondary: string;
+	badge_accent: string;
+	toast_success: string;
+	toast_error: string;
 	created_at?: string;
 	updated_at?: string;
 }

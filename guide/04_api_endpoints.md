@@ -44,6 +44,10 @@
 
 - `GET /org-units`
 - `POST /org-units`
+- `GET /components`
+- `POST /components`
+- `GET /components/{id}`
+- `PATCH /components/{id}`
 - `GET /employments`
 - `POST /employments`
 - `GET /payroll-subjects`

@@ -36,6 +36,11 @@
 	let calculationMode: 'monthly' | 'yearly' = 'monthly'; // Default: bulanan
 	let previousCalculationMode: 'monthly' | 'yearly' | null = null;
 	let currentStep: 1 | 2 | 3 = 1; // Wizard steps: 1=Pilih Pegawai, 2=Input Data, 3=Hasil
+	
+	// Modal warning untuk duplikasi
+	let showDuplicateWarning = false;
+	let duplicateWarningModal: HTMLDialogElement | null = null;
+	let duplicateEmployees: Array<{ employment_id: number; person_name: string }> = [];
 
 	const monthOptions = Array.from({ length: 12 }, (_, i) => ({
 		value: i + 1,
@@ -472,7 +477,38 @@
 		}
 	}
 
-	async function calculateBatch() {
+	// Cek apakah ada perhitungan yang sudah ada untuk pegawai yang dipilih
+	async function checkDuplicateCalculations(): Promise<Array<{ employment_id: number; person_name: string }>> {
+		const duplicates: Array<{ employment_id: number; person_name: string }> = [];
+		
+		// Cek untuk setiap pegawai yang dipilih
+		for (const employee of selectedEmployees.values()) {
+			try {
+				const history = await calculatorApi.getHistory({
+					employment_id: employee.id,
+					year: year,
+					month: month,
+					per_page: 1
+				});
+				
+				// Jika ada history untuk bulan/tahun ini, berarti duplikasi
+				if (history.data && history.data.length > 0) {
+					duplicates.push({
+						employment_id: employee.id,
+						person_name: employee.person_name
+					});
+				}
+			} catch (error) {
+				// Jika error saat cek, skip pegawai ini (biarkan tetap dihitung)
+				console.error('Error checking duplicate for employee:', employee.id, error);
+			}
+		}
+		
+		return duplicates;
+	}
+
+	// Fungsi untuk melakukan perhitungan (dipanggil setelah konfirmasi)
+	async function performCalculation() {
 		if (selectedEmployees.size === 0) {
 			batchResult = null;
 			return;
@@ -548,6 +584,69 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	// Fungsi utama yang dipanggil saat tombol "Hitung PPh 21" diklik
+	async function calculateBatch() {
+		if (selectedEmployees.size === 0) {
+			batchResult = null;
+			return;
+		}
+
+		// Check if at least one employee has bruto > 0
+		const hasValidData = Array.from(selectedEmployees.values()).some(
+			(emp) => emp.calcData.bruto > 0
+		);
+
+		if (!hasValidData) {
+			batchResult = null;
+			return;
+		}
+
+		// Cek duplikasi sebelum melakukan perhitungan
+		loading = true;
+		try {
+			const duplicates = await checkDuplicateCalculations();
+			
+			if (duplicates.length > 0) {
+				// Ada duplikasi, tampilkan modal warning
+				duplicateEmployees = duplicates;
+				showDuplicateWarning = true;
+				if (duplicateWarningModal) {
+					duplicateWarningModal.showModal();
+				}
+			} else {
+				// Tidak ada duplikasi, langsung hitung
+				await performCalculation();
+			}
+		} catch (error: any) {
+			console.error('Error checking duplicates:', error);
+			// Jika error saat cek, tetap lanjutkan perhitungan
+			await performCalculation();
+		} finally {
+			loading = false;
+		}
+	}
+
+	// Fungsi untuk handle konfirmasi dari modal
+	async function handleConfirmCalculation() {
+		showDuplicateWarning = false;
+		if (duplicateWarningModal) {
+			duplicateWarningModal.close();
+		}
+		duplicateEmployees = [];
+		
+		// Lakukan perhitungan
+		await performCalculation();
+	}
+
+	// Fungsi untuk handle cancel dari modal
+	function handleCancelCalculation() {
+		showDuplicateWarning = false;
+		if (duplicateWarningModal) {
+			duplicateWarningModal.close();
+		}
+		duplicateEmployees = [];
 	}
 
 	function getEmployeeResult(employmentId: number) {
@@ -1481,3 +1580,50 @@
 		{/if}
 	{/if}
 </div>
+
+<!-- Modal Warning Duplikasi -->
+{#if showDuplicateWarning && duplicateEmployees.length > 0}
+	<dialog bind:this={duplicateWarningModal} id="duplicate-warning-modal" class="modal">
+		<div class="modal-box bg-base-100 text-base-content">
+			<h3 class="font-bold text-lg mb-4 text-base-content flex items-center gap-2">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+				</svg>
+				Peringatan: Data Akan Tertimpa
+			</h3>
+
+			<div class="space-y-4">
+				<div class="alert alert-warning">
+					<svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+					</svg>
+					<div>
+						<p class="font-semibold">Anda sudah melakukan perhitungan untuk pegawai berikut di bulan {monthOptions.find(m => m.value === month)?.label} {year}.</p>
+						<p class="text-sm mt-1">Jika Anda melanjutkan, data perhitungan yang sudah ada akan tertimpa dengan data baru.</p>
+					</div>
+				</div>
+
+				<div class="bg-base-200 rounded-lg p-4">
+					<div class="text-sm font-semibold text-base-content mb-2">Pegawai yang akan tertimpa:</div>
+					<ul class="list-disc list-inside space-y-1">
+						{#each duplicateEmployees as dup}
+							<li class="text-base-content">{dup.person_name}</li>
+						{/each}
+					</ul>
+				</div>
+			</div>
+
+			<div class="modal-action mt-6">
+				<button class="btn btn-ghost" on:click={handleCancelCalculation}>
+					Batal
+				</button>
+				<button class="btn btn-warning" on:click={handleConfirmCalculation}>
+					Lanjut
+				</button>
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop" on:submit|preventDefault={handleCancelCalculation}>
+			<button>close</button>
+		</form>
+	</dialog>
+{/if}

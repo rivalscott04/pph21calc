@@ -10,7 +10,13 @@ export interface BrandColors {
 	neutral: string;
 	base100: string;
 	button: string;
-	badge: string;
+	badge_success: string;
+	badge_error: string;
+	badge_primary: string;
+	badge_secondary: string;
+	badge_accent: string;
+	toast_success: string;
+	toast_error: string;
 }
 
 // Store untuk brand colors (default values - dark theme)
@@ -21,7 +27,13 @@ export const brandColors = writable<BrandColors>({
 	neutral: '#3d4451',
 	base100: '#1e293b', // dark slate-800
 	button: '#0ea5e9',
-	badge: '#3d4451'
+	badge_success: '#10b981',
+	badge_error: '#ef4444',
+	badge_primary: '#0ea5e9',
+	badge_secondary: '#10b981',
+	badge_accent: '#f59e0b',
+	toast_success: '#10b981',
+	toast_error: '#ef4444'
 });
 
 // Convert HEX to HSL
@@ -78,8 +90,15 @@ export function applyBrandTheme(colors: BrandColors) {
 		root.style.setProperty('--b1', hexToHsl(colors.base100));
 		// Button color - use custom CSS variable for button component
 		root.style.setProperty('--btn-color', colors.button);
-		// Badge color - use custom CSS variable for badge component
-		root.style.setProperty('--badge-color', colors.badge);
+		// Badge colors - use custom CSS variables for badge components
+		root.style.setProperty('--badge-success-color', colors.badge_success);
+		root.style.setProperty('--badge-error-color', colors.badge_error);
+		root.style.setProperty('--badge-primary-color', colors.badge_primary);
+		root.style.setProperty('--badge-secondary-color', colors.badge_secondary);
+		root.style.setProperty('--badge-accent-color', colors.badge_accent);
+		// Toast colors - use custom CSS variables for toast components
+		root.style.setProperty('--toast-success-color', colors.toast_success);
+		root.style.setProperty('--toast-error-color', colors.toast_error);
 		
 		// Update store (use setTimeout to avoid blocking)
 		setTimeout(() => {
@@ -124,7 +143,13 @@ function configToBrandColors(config: ConfigBranding): BrandColors {
 		neutral: config.neutral,
 		base100: config.base100,
 		button: config.button || config.primary, // fallback to primary if button not set
-		badge: config.badge || config.neutral // fallback to neutral if badge not set
+		badge_success: config.badge_success || config.secondary, // fallback to secondary if badge_success not set
+		badge_error: config.badge_error || '#ef4444', // fallback to red if badge_error not set
+		badge_primary: config.badge_primary || config.primary, // fallback to primary if badge_primary not set
+		badge_secondary: config.badge_secondary || config.secondary, // fallback to secondary if badge_secondary not set
+		badge_accent: config.badge_accent || config.accent, // fallback to accent if badge_accent not set
+		toast_success: config.toast_success || config.secondary, // fallback to secondary if toast_success not set
+		toast_error: config.toast_error || '#ef4444' // fallback to red if toast_error not set
 	};
 }
 
@@ -213,7 +238,13 @@ export async function initBrandTheme() {
 				neutral: '#3d4451',
 				base100: '#1e293b',
 				button: '#0ea5e9',
-				badge: '#3d4451'
+				badge_success: '#10b981',
+				badge_error: '#ef4444',
+				badge_primary: '#0ea5e9',
+				badge_secondary: '#10b981',
+				badge_accent: '#f59e0b',
+				toast_success: '#10b981',
+				toast_error: '#ef4444'
 			};
 			// Apply directly without updating store to prevent infinite loop
 			const root = document.documentElement;
@@ -224,7 +255,13 @@ export async function initBrandTheme() {
 			root.style.setProperty('--n', hexToHsl(defaultColors.neutral));
 			root.style.setProperty('--b1', hexToHsl(defaultColors.base100));
 			root.style.setProperty('--btn-color', defaultColors.button);
-			root.style.setProperty('--badge-color', defaultColors.badge);
+			root.style.setProperty('--badge-success-color', defaultColors.badge_success);
+			root.style.setProperty('--badge-error-color', defaultColors.badge_error);
+			root.style.setProperty('--badge-primary-color', defaultColors.badge_primary);
+			root.style.setProperty('--badge-secondary-color', defaultColors.badge_secondary);
+			root.style.setProperty('--badge-accent-color', defaultColors.badge_accent);
+			root.style.setProperty('--toast-success-color', defaultColors.toast_success);
+			root.style.setProperty('--toast-error-color', defaultColors.toast_error);
 		}
 	} catch (error) {
 		console.error('Error initializing brand theme:', error);
@@ -239,7 +276,13 @@ export async function initBrandTheme() {
 				neutral: '#3d4451',
 				base100: '#1e293b',
 				button: '#0ea5e9',
-				badge: '#3d4451'
+				badge_success: '#10b981',
+				badge_error: '#ef4444',
+				badge_primary: '#0ea5e9',
+				badge_secondary: '#10b981',
+				badge_accent: '#f59e0b',
+				toast_success: '#10b981',
+				toast_error: '#ef4444'
 			};
 			root.style.setProperty('--p', hexToHsl(defaultColors.primary));
 			root.style.setProperty('--s', hexToHsl(defaultColors.secondary));
@@ -247,7 +290,13 @@ export async function initBrandTheme() {
 			root.style.setProperty('--n', hexToHsl(defaultColors.neutral));
 			root.style.setProperty('--b1', hexToHsl(defaultColors.base100));
 			root.style.setProperty('--btn-color', defaultColors.button);
-			root.style.setProperty('--badge-color', defaultColors.badge);
+			root.style.setProperty('--badge-success-color', defaultColors.badge_success);
+			root.style.setProperty('--badge-error-color', defaultColors.badge_error);
+			root.style.setProperty('--badge-primary-color', defaultColors.badge_primary);
+			root.style.setProperty('--badge-secondary-color', defaultColors.badge_secondary);
+			root.style.setProperty('--badge-accent-color', defaultColors.badge_accent);
+			root.style.setProperty('--toast-success-color', defaultColors.toast_success);
+			root.style.setProperty('--toast-error-color', defaultColors.toast_error);
 		}
 	}
 }

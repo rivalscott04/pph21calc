@@ -15,7 +15,13 @@
 		neutral: '#3d4451',
 		base100: '#1e293b',
 		button: '#0ea5e9',
-		badge: '#3d4451'
+		badge_success: '#10b981',
+		badge_error: '#ef4444',
+		badge_primary: '#0ea5e9',
+		badge_secondary: '#10b981',
+		badge_accent: '#f59e0b',
+		toast_success: '#10b981',
+		toast_error: '#ef4444'
 	};
 
 	// Validate HEX color
@@ -41,7 +47,13 @@
 			neutral: '#3d4451',
 			base100: '#1e293b',
 			button: '#0ea5e9',
-			badge: '#3d4451'
+			badge_success: '#10b981',
+			badge_error: '#ef4444',
+			badge_primary: '#0ea5e9',
+			badge_secondary: '#10b981',
+			badge_accent: '#f59e0b',
+			toast_success: '#10b981',
+			toast_error: '#ef4444'
 		};
 		applyBrandTheme(colors);
 		toast.info('Warna direset ke default');
@@ -108,12 +120,20 @@
 				<div class="card-body">
 					<h2 class="card-title text-base-content">Warna Brand</h2>
 					<p class="text-sm text-base-content opacity-70 mb-4">
-						Masukkan kode warna HEX (contoh: #0ea5e9) untuk setiap warna brand
+						Klik pada kotak warna untuk mengubah warna brand. Kode HEX akan terupdate otomatis.
 					</p>
 
-					<div class="space-y-4">
-						<!-- Primary Color -->
-						<label class="form-control">
+					<div class="space-y-2">
+						<!-- Brand Colors Accordion -->
+						<div class="collapse collapse-arrow bg-base-200">
+							<input type="radio" name="color-accordion" checked />
+							<div class="collapse-title text-lg font-semibold text-base-content">
+								Warna Brand
+							</div>
+							<div class="collapse-content">
+								<div class="space-y-4 pt-2">
+									<!-- Primary Color -->
+									<label class="form-control">
 							<div class="label">
 								<span class="label-text font-semibold text-base-content">Warna Primary</span>
 								<span class="label-text-alt text-base-content opacity-60">Warna utama brand</span>
@@ -130,14 +150,14 @@
 									class="input input-bordered flex-1 font-mono"
 									placeholder="#0ea5e9"
 									bind:value={colors.primary}
-									on:input={(e) => updateColor('primary', e.currentTarget.value)}
-									maxlength="7"
+									readonly
+									tabindex="-1"
 								/>
 							</div>
-						</label>
+									</label>
 
-						<!-- Secondary Color -->
-						<label class="form-control">
+									<!-- Secondary Color -->
+									<label class="form-control">
 							<div class="label">
 								<span class="label-text font-semibold text-base-content">Warna Secondary</span>
 								<span class="label-text-alt text-base-content opacity-60">Warna sekunder brand</span>
@@ -154,14 +174,14 @@
 									class="input input-bordered flex-1 font-mono"
 									placeholder="#10b981"
 									bind:value={colors.secondary}
-									on:input={(e) => updateColor('secondary', e.currentTarget.value)}
-									maxlength="7"
+									readonly
+									tabindex="-1"
 								/>
 							</div>
-						</label>
+									</label>
 
-						<!-- Accent Color -->
-						<label class="form-control">
+									<!-- Accent Color -->
+									<label class="form-control">
 							<div class="label">
 								<span class="label-text font-semibold text-base-content">Warna Accent</span>
 								<span class="label-text-alt text-base-content opacity-60">Warna aksen/highlight</span>
@@ -178,14 +198,14 @@
 									class="input input-bordered flex-1 font-mono"
 									placeholder="#f59e0b"
 									bind:value={colors.accent}
-									on:input={(e) => updateColor('accent', e.currentTarget.value)}
-									maxlength="7"
+									readonly
+									tabindex="-1"
 								/>
 							</div>
-						</label>
+									</label>
 
-						<!-- Neutral Color -->
-						<label class="form-control">
+									<!-- Neutral Color -->
+									<label class="form-control">
 							<div class="label">
 								<span class="label-text font-semibold text-base-content">Warna Neutral</span>
 								<span class="label-text-alt text-base-content opacity-60">Warna netral/abu-abu</span>
@@ -202,8 +222,8 @@
 									class="input input-bordered flex-1 font-mono"
 									placeholder="#3d4451"
 									bind:value={colors.neutral}
-									on:input={(e) => updateColor('neutral', e.currentTarget.value)}
-									maxlength="7"
+									readonly
+									tabindex="-1"
 								/>
 							</div>
 						</label>
@@ -226,14 +246,25 @@
 									class="input input-bordered flex-1 font-mono"
 									placeholder="#1e293b"
 									bind:value={colors.base100}
-									on:input={(e) => updateColor('base100', e.currentTarget.value)}
-									maxlength="7"
+									readonly
+									tabindex="-1"
 								/>
 							</div>
-						</label>
+									</label>
+								</div>
+							</div>
+						</div>
 
-						<!-- Button Color -->
-						<label class="form-control">
+						<!-- Component Colors Accordion -->
+						<div class="collapse collapse-arrow bg-base-200">
+							<input type="radio" name="color-accordion" />
+							<div class="collapse-title text-lg font-semibold text-base-content">
+								Warna Komponen
+							</div>
+							<div class="collapse-content">
+								<div class="space-y-4 pt-2">
+									<!-- Button Color -->
+									<label class="form-control">
 							<div class="label">
 								<span class="label-text font-semibold text-base-content">Warna Button</span>
 								<span class="label-text-alt text-base-content opacity-60">Warna untuk komponen button</span>
@@ -250,35 +281,193 @@
 									class="input input-bordered flex-1 font-mono"
 									placeholder="#0ea5e9"
 									bind:value={colors.button}
-									on:input={(e) => updateColor('button', e.currentTarget.value)}
-									maxlength="7"
+									readonly
+									tabindex="-1"
 								/>
 							</div>
-						</label>
+									</label>
+								</div>
+							</div>
+						</div>
 
-						<!-- Badge Color -->
-						<label class="form-control">
+						<!-- Status Colors Accordion -->
+						<div class="collapse collapse-arrow bg-base-200">
+							<input type="radio" name="color-accordion" />
+							<div class="collapse-title text-lg font-semibold text-base-content">
+								Warna Status
+							</div>
+							<div class="collapse-content">
+								<div class="space-y-4 pt-2">
+									<!-- Badge Success Color -->
+									<label class="form-control">
 							<div class="label">
-								<span class="label-text font-semibold text-base-content">Warna Badge</span>
-								<span class="label-text-alt text-base-content opacity-60">Warna default untuk komponen badge</span>
+								<span class="label-text font-semibold text-base-content">Warna Badge Success</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk badge success/berhasil</span>
 							</div>
 							<div class="flex gap-3 items-center">
 								<input
 									type="color"
 									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
-									bind:value={colors.badge}
-									on:input={(e) => updateColor('badge', e.currentTarget.value)}
+									bind:value={colors.badge_success}
+									on:input={(e) => updateColor('badge_success', e.currentTarget.value)}
 								/>
 								<input
 									type="text"
 									class="input input-bordered flex-1 font-mono"
-									placeholder="#3d4451"
-									bind:value={colors.badge}
-									on:input={(e) => updateColor('badge', e.currentTarget.value)}
+									placeholder="#10b981"
+									bind:value={colors.badge_success}
+									readonly
+									tabindex="-1"
+								/>
+							</div>
+									</label>
+
+									<!-- Badge Error Color -->
+									<label class="form-control">
+							<div class="label">
+								<span class="label-text font-semibold text-base-content">Warna Badge Error</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk badge error/gagal</span>
+							</div>
+							<div class="flex gap-3 items-center">
+								<input
+									type="color"
+									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
+									bind:value={colors.badge_error}
+									on:input={(e) => updateColor('badge_error', e.currentTarget.value)}
+								/>
+								<input
+									type="text"
+									class="input input-bordered flex-1 font-mono"
+									placeholder="#ef4444"
+									bind:value={colors.badge_error}
+									on:input={(e) => updateColor('badge_error', e.currentTarget.value)}
 									maxlength="7"
 								/>
 							</div>
+									</label>
+
+									<!-- Badge Primary Color -->
+									<label class="form-control">
+							<div class="label">
+								<span class="label-text font-semibold text-base-content">Warna Badge Primary</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk badge primary</span>
+							</div>
+							<div class="flex gap-3 items-center">
+								<input
+									type="color"
+									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
+									bind:value={colors.badge_primary}
+									on:input={(e) => updateColor('badge_primary', e.currentTarget.value)}
+								/>
+								<input
+									type="text"
+									class="input input-bordered flex-1 font-mono"
+									placeholder="#0ea5e9"
+									bind:value={colors.badge_primary}
+									on:input={(e) => updateColor('badge_primary', e.currentTarget.value)}
+									maxlength="7"
+								/>
+							</div>
+									</label>
+
+									<!-- Badge Secondary Color -->
+									<label class="form-control">
+							<div class="label">
+								<span class="label-text font-semibold text-base-content">Warna Badge Secondary</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk badge secondary</span>
+							</div>
+							<div class="flex gap-3 items-center">
+								<input
+									type="color"
+									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
+									bind:value={colors.badge_secondary}
+									on:input={(e) => updateColor('badge_secondary', e.currentTarget.value)}
+								/>
+								<input
+									type="text"
+									class="input input-bordered flex-1 font-mono"
+									placeholder="#10b981"
+									bind:value={colors.badge_secondary}
+									on:input={(e) => updateColor('badge_secondary', e.currentTarget.value)}
+									maxlength="7"
+								/>
+							</div>
+									</label>
+
+									<!-- Badge Accent Color -->
+									<label class="form-control">
+							<div class="label">
+								<span class="label-text font-semibold text-base-content">Warna Badge Accent</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk badge accent</span>
+							</div>
+							<div class="flex gap-3 items-center">
+								<input
+									type="color"
+									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
+									bind:value={colors.badge_accent}
+									on:input={(e) => updateColor('badge_accent', e.currentTarget.value)}
+								/>
+								<input
+									type="text"
+									class="input input-bordered flex-1 font-mono"
+									placeholder="#f59e0b"
+									bind:value={colors.badge_accent}
+									on:input={(e) => updateColor('badge_accent', e.currentTarget.value)}
+									maxlength="7"
+								/>
+							</div>
+									</label>
+
+									<!-- Toast Success Color -->
+									<label class="form-control">
+							<div class="label">
+								<span class="label-text font-semibold text-base-content">Warna Toast Success</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk toast success/berhasil</span>
+							</div>
+							<div class="flex gap-3 items-center">
+								<input
+									type="color"
+									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
+									bind:value={colors.toast_success}
+									on:input={(e) => updateColor('toast_success', e.currentTarget.value)}
+								/>
+								<input
+									type="text"
+									class="input input-bordered flex-1 font-mono"
+									placeholder="#10b981"
+									bind:value={colors.toast_success}
+									readonly
+									tabindex="-1"
+								/>
+							</div>
 						</label>
+
+						<!-- Toast Error Color -->
+						<label class="form-control">
+							<div class="label">
+								<span class="label-text font-semibold text-base-content">Warna Toast Error</span>
+								<span class="label-text-alt text-base-content opacity-60">Warna untuk toast error/gagal</span>
+							</div>
+							<div class="flex gap-3 items-center">
+								<input
+									type="color"
+									class="w-16 h-16 rounded-lg border-2 border-base-300 cursor-pointer"
+									bind:value={colors.toast_error}
+									on:input={(e) => updateColor('toast_error', e.currentTarget.value)}
+								/>
+								<input
+									type="text"
+									class="input input-bordered flex-1 font-mono"
+									placeholder="#ef4444"
+									bind:value={colors.toast_error}
+									readonly
+									tabindex="-1"
+								/>
+							</div>
+									</label>
+								</div>
+							</div>
+						</div>
 
 						<!-- Action Buttons -->
 						<div class="flex gap-3 pt-4">
@@ -372,10 +561,31 @@
 
 							<!-- Badge Preview -->
 							<div class="flex flex-wrap gap-2">
-								<span class="badge badge-brand">Badge Custom (Brand)</span>
-								<span class="badge badge-primary">Badge Primary</span>
-								<span class="badge badge-secondary">Badge Secondary</span>
-								<span class="badge badge-accent">Badge Accent</span>
+								<span class="badge badge-success-brand">Badge Success (Brand)</span>
+								<span class="badge badge-error-brand">Badge Error (Brand)</span>
+								<span class="badge badge-primary-brand">Badge Primary (Brand)</span>
+								<span class="badge badge-secondary-brand">Badge Secondary (Brand)</span>
+								<span class="badge badge-accent-brand">Badge Accent (Brand)</span>
+							</div>
+
+							<!-- Toast Preview -->
+							<div class="space-y-2">
+								<div class="alert toast-success-brand shadow-lg max-w-md">
+									<div class="flex items-center gap-3 w-full">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+										</svg>
+										<span class="flex-1 text-white">Toast Success (Brand)</span>
+									</div>
+								</div>
+								<div class="alert toast-error-brand shadow-lg max-w-md">
+									<div class="flex items-center gap-3 w-full">
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+										<span class="flex-1 text-white">Toast Error (Brand)</span>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>

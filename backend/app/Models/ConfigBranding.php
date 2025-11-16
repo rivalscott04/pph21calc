@@ -21,7 +21,13 @@ class ConfigBranding extends Model
         'neutral',
         'base100',
         'button',
-        'badge',
+        'badge_success',
+        'badge_error',
+        'badge_primary',
+        'badge_secondary',
+        'badge_accent',
+        'toast_success',
+        'toast_error',
     ];
 
     /**

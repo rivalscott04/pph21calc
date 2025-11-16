@@ -135,7 +135,13 @@ class ConfigController extends Controller
                 'neutral' => '#3d4451',
                 'base100' => '#ffffff',
                 'button' => '#0ea5e9',
-                'badge' => '#3d4451',
+                'badge_success' => '#10b981',
+                'badge_error' => '#ef4444',
+                'badge_primary' => '#0ea5e9',
+                'badge_secondary' => '#10b981',
+                'badge_accent' => '#f59e0b',
+                'toast_success' => '#10b981',
+                'toast_error' => '#ef4444',
             ]
         );
 
@@ -183,7 +189,13 @@ class ConfigController extends Controller
             'neutral' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'base100' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'button' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
-            'badge' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'badge_success' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'badge_error' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'badge_primary' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'badge_secondary' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'badge_accent' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'toast_success' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'toast_error' => 'sometimes|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
         $config = ConfigBranding::updateOrCreate(

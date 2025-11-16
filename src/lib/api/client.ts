@@ -2,7 +2,27 @@ import { auth } from '$lib/stores/auth.js';
 import { toast } from '$lib/stores/toast.js';
 import { goto } from '$app/navigation';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+// Support relative URLs for production (same domain) and absolute URLs for development
+// If VITE_API_URL is empty or starts with '/', use relative URL
+// Otherwise, use the provided absolute URL
+const getApiBaseUrl = (): string => {
+	const envUrl = import.meta.env.VITE_API_URL;
+	
+	// If not set, default to development URL
+	if (!envUrl) {
+		return 'http://localhost:8000/api';
+	}
+	
+	// If empty string or starts with '/', use relative URL
+	if (envUrl === '' || envUrl.startsWith('/')) {
+		return envUrl || '/api';
+	}
+	
+	// Otherwise use the provided absolute URL
+	return envUrl;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface ApiError {
 	message: string;
@@ -90,17 +110,29 @@ export async function apiRequest<T>(
 ): Promise<T> {
 	const token = auth.getToken();
 	
-	const headers: HeadersInit = {
+	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 		'Accept': 'application/json',
-		...options.headers
+		...(options.headers as Record<string, string> || {})
 	};
 	
 	if (token) {
 		headers['Authorization'] = `Bearer ${token}`;
 	}
 	
-	const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+	// Build URL: if endpoint is already absolute, use it; otherwise combine with base URL
+	let url: string;
+	if (endpoint.startsWith('http')) {
+		url = endpoint;
+	} else if (API_BASE_URL.startsWith('/')) {
+		// Relative URL: ensure endpoint starts with '/' and combine properly
+		const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+		url = `${API_BASE_URL}${cleanEndpoint}`;
+	} else {
+		// Absolute URL: ensure proper joining
+		const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+		url = `${API_BASE_URL}${cleanEndpoint}`;
+	}
 	
 	try {
 		const response = await fetch(url, {

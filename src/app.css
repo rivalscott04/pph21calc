@@ -121,6 +121,37 @@
 	opacity: 1 !important;
 }
 
+/* Today button text white - default and hover */
+.fc-today-button,
+.fc-today-button.fc-button,
+.fc-today-button.fc-button-primary {
+	color: #ffffff !important;
+}
+
+.fc-today-button:hover,
+.fc-today-button.fc-button:hover,
+.fc-today-button.fc-button-primary:hover {
+	color: #ffffff !important;
+}
+
+.fc-today-button:active,
+.fc-today-button.fc-button:active,
+.fc-today-button.fc-button-primary:active {
+	color: #ffffff !important;
+}
+
+.fc-today-button:focus,
+.fc-today-button.fc-button:focus,
+.fc-today-button.fc-button-primary:focus {
+	color: #ffffff !important;
+}
+
+/* Chevron icons white */
+.fc-icon-chevron-right,
+.fc-icon-chevron-left {
+	color: #ffffff !important;
+}
+
 /* Event styling - ensure text is readable */
 .fc-event {
 	border-radius: 0.375rem;
@@ -249,8 +280,16 @@ p, span, div, a, button, label, input, select, textarea {
   /* Button color - custom branding color */
   --btn-color: #0ea5e9; /* default button color, will be overridden by applyBrandTheme */
   
-  /* Badge color - custom branding color */
-  --badge-color: #3d4451; /* default badge color, will be overridden by applyBrandTheme */
+  /* Badge colors - custom branding colors */
+  --badge-success-color: #10b981; /* default badge success color, will be overridden by applyBrandTheme */
+  --badge-error-color: #ef4444; /* default badge error color, will be overridden by applyBrandTheme */
+  --badge-primary-color: #0ea5e9; /* default badge primary color, will be overridden by applyBrandTheme */
+  --badge-secondary-color: #10b981; /* default badge secondary color, will be overridden by applyBrandTheme */
+  --badge-accent-color: #f59e0b; /* default badge accent color, will be overridden by applyBrandTheme */
+  
+  /* Toast colors - custom branding colors */
+  --toast-success-color: #10b981; /* default toast success color, will be overridden by applyBrandTheme */
+  --toast-error-color: #ef4444; /* default toast error color, will be overridden by applyBrandTheme */
 }
 
 /* Apply custom button color to buttons with btn-brand class or buttons without color modifier */
@@ -280,15 +319,89 @@ p, span, div, a, button, label, input, select, textarea {
   color: white !important;
 }
 
-/* Apply custom badge color to badges with badge-brand class */
-.badge-brand {
-  background-color: var(--badge-color) !important;
-  border-color: var(--badge-color) !important;
-  color: var(--bc) !important;
+/* Apply custom badge success color to badges with badge-success-brand class */
+.badge-success-brand {
+  background-color: var(--badge-success-color) !important;
+  border-color: var(--badge-success-color) !important;
+  color: white !important;
 }
 
-.badge-brand:hover {
-  background-color: var(--badge-color) !important;
-  border-color: var(--badge-color) !important;
+.badge-success-brand:hover {
+  background-color: var(--badge-success-color) !important;
+  border-color: var(--badge-success-color) !important;
   opacity: 0.9;
+}
+
+/* Apply custom badge error color to badges with badge-error-brand class */
+.badge-error-brand {
+  background-color: var(--badge-error-color) !important;
+  border-color: var(--badge-error-color) !important;
+  color: white !important;
+}
+
+.badge-error-brand:hover {
+  background-color: var(--badge-error-color) !important;
+  border-color: var(--badge-error-color) !important;
+  opacity: 0.9;
+}
+
+/* Apply custom badge primary color to badges with badge-primary-brand class */
+.badge-primary-brand {
+  background-color: var(--badge-primary-color) !important;
+  border-color: var(--badge-primary-color) !important;
+  color: white !important;
+}
+
+.badge-primary-brand:hover {
+  background-color: var(--badge-primary-color) !important;
+  border-color: var(--badge-primary-color) !important;
+  opacity: 0.9;
+}
+
+/* Apply custom badge secondary color to badges with badge-secondary-brand class */
+.badge-secondary-brand {
+  background-color: var(--badge-secondary-color) !important;
+  border-color: var(--badge-secondary-color) !important;
+  color: white !important;
+}
+
+.badge-secondary-brand:hover {
+  background-color: var(--badge-secondary-color) !important;
+  border-color: var(--badge-secondary-color) !important;
+  opacity: 0.9;
+}
+
+/* Apply custom badge accent color to badges with badge-accent-brand class */
+.badge-accent-brand {
+  background-color: var(--badge-accent-color) !important;
+  border-color: var(--badge-accent-color) !important;
+  color: white !important;
+}
+
+.badge-accent-brand:hover {
+  background-color: var(--badge-accent-color) !important;
+  border-color: var(--badge-accent-color) !important;
+  opacity: 0.9;
+}
+
+/* Apply custom toast success color to alerts with toast-success-brand class */
+.alert.toast-success-brand {
+  background-color: var(--toast-success-color) !important;
+  border-color: var(--toast-success-color) !important;
+  color: white !important;
+}
+
+.alert.toast-success-brand svg {
+  color: white !important;
+}
+
+/* Apply custom toast error color to alerts with toast-error-brand class */
+.alert.toast-error-brand {
+  background-color: var(--toast-error-color) !important;
+  border-color: var(--toast-error-color) !important;
+  color: white !important;
+}
+
+.alert.toast-error-brand svg {
+  color: white !important;
 }

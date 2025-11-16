@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalculatorController;
+use App\Http\Controllers\Api\ComponentController;
 use App\Http\Controllers\Api\ConfigController;
 use App\Http\Controllers\Api\CoreTaxController;
 use App\Http\Controllers\Api\DashboardController;
@@ -66,6 +67,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/org-units', [OrgUnitController::class, 'store']);
         Route::get('/org-units/{id}', [OrgUnitController::class, 'show']);
         Route::patch('/org-units/{id}', [OrgUnitController::class, 'update']);
+
+        // Components
+        Route::get('/components', [ComponentController::class, 'index']);
+        Route::post('/components', [ComponentController::class, 'store']);
+        Route::get('/components/{id}', [ComponentController::class, 'show']);
+        Route::patch('/components/{id}', [ComponentController::class, 'update']);
 
         // Employments
         Route::get('/employments', [EmploymentController::class, 'index']);
