@@ -20,21 +20,39 @@
 	let filterCalculationType = '';
 	let filterActive: boolean | null = null;
 
-	let showFormModal = false;
-	let formMode: FormMode = 'create';
-	let formData = {
-		code: '',
-		name: '',
-		type: 'custom' as 'mandatory' | 'custom',
-		calculation_type: 'manual' as 'auto' | 'manual' | 'percentage',
-		is_tax_deductible: true,
-		priority: 0,
-		is_active: true,
-		notes: ''
-	};
-	let formErrors: Record<string, string> = {};
-	let editingComponent: DeductionComponent | null = null;
-	let deletingComponent: DeductionComponent | null = null;
+const filterIds = {
+	search: 'deduction-filter-search',
+	type: 'deduction-filter-type',
+	calculation: 'deduction-filter-calculation',
+	status: 'deduction-filter-status'
+} as const;
+
+const formFieldIds = {
+	code: 'deduction-form-code',
+	name: 'deduction-form-name',
+	type: 'deduction-form-type',
+	calculationType: 'deduction-form-calculation',
+	taxToggle: 'deduction-form-tax-toggle',
+	priority: 'deduction-form-priority',
+	activeToggle: 'deduction-form-active',
+	notes: 'deduction-form-notes'
+} as const;
+
+let showFormModal = false;
+let formMode: FormMode = 'create';
+let formData = {
+	code: '',
+	name: '',
+	type: 'custom' as 'mandatory' | 'custom',
+	calculation_type: 'manual' as 'auto' | 'manual' | 'percentage',
+	is_tax_deductible: true,
+	priority: 0,
+	is_active: true,
+	notes: ''
+};
+let formErrors: Record<string, string> = {};
+let editingComponent: DeductionComponent | null = null;
+let deletingComponent: DeductionComponent | null = null;
 const tableSkeletonRows = Array.from({ length: 6 });
 const tableSkeletonCols = Array.from({ length: 8 });
 
@@ -251,10 +269,11 @@ const tableSkeletonCols = Array.from({ length: 8 });
 		<div class="card-body">
 			<div class="flex flex-wrap gap-4 items-end">
 				<div class="form-control flex-1 min-w-[200px]">
-					<label class="label">
+					<label class="label" for={filterIds.search}>
 						<span class="label-text text-base-content">Cari</span>
 					</label>
 					<input 
+						id={filterIds.search}
 						type="text" 
 						placeholder="Cari kode atau nama..." 
 						class="input input-bordered text-base-content"
@@ -263,10 +282,10 @@ const tableSkeletonCols = Array.from({ length: 8 });
 					/>
 				</div>
 				<div class="form-control min-w-[150px]">
-					<label class="label">
+					<label class="label" for={filterIds.type}>
 						<span class="label-text text-base-content">Tipe</span>
 					</label>
-					<select class="select select-bordered text-base-content" bind:value={filterType}>
+					<select id={filterIds.type} class="select select-bordered text-base-content" bind:value={filterType}>
 						<option value="">Semua</option>
 						{#each typeOptions as opt}
 							<option value={opt.value}>{opt.label}</option>
@@ -274,10 +293,10 @@ const tableSkeletonCols = Array.from({ length: 8 });
 					</select>
 				</div>
 				<div class="form-control min-w-[150px]">
-					<label class="label">
+					<label class="label" for={filterIds.calculation}>
 						<span class="label-text text-base-content">Perhitungan</span>
 					</label>
-					<select class="select select-bordered text-base-content" bind:value={filterCalculationType}>
+					<select id={filterIds.calculation} class="select select-bordered text-base-content" bind:value={filterCalculationType}>
 						<option value="">Semua</option>
 						{#each calculationTypeOptions as opt}
 							<option value={opt.value}>{opt.label}</option>
@@ -285,10 +304,10 @@ const tableSkeletonCols = Array.from({ length: 8 });
 					</select>
 				</div>
 				<div class="form-control min-w-[150px]">
-					<label class="label">
+					<label class="label" for={filterIds.status}>
 						<span class="label-text text-base-content">Status</span>
 					</label>
-					<select class="select select-bordered text-base-content" bind:value={filterActive}>
+					<select id={filterIds.status} class="select select-bordered text-base-content" bind:value={filterActive}>
 						<option value={null}>Semua</option>
 						<option value={true}>Aktif</option>
 						<option value={false}>Non-Aktif</option>
@@ -449,7 +468,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 					
 					<!-- Code -->
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.code}>
 							<span class="label-text text-base-content font-medium">
 								Kode <span class="text-error">*</span>
 								<div class="tooltip tooltip-right" data-tip="Kode unik untuk identifikasi komponen. Harus unik per tenant. Contoh: IP001, ZAKAT, BJ001">
@@ -460,25 +479,22 @@ const tableSkeletonCols = Array.from({ length: 8 });
 							</span>
 						</label>
 						<input 
+							id={formFieldIds.code}
 							type="text" 
 							placeholder="Contoh: IP001, ZAKAT, BJ001" 
 							class="input input-bordered text-base-content {formErrors.code ? 'input-error' : ''}"
 							bind:value={formData.code}
 						/>
 						{#if formErrors.code}
-							<label class="label">
-								<span class="label-text-alt text-error">{formErrors.code}</span>
-							</label>
+							<p class="label-text-alt text-error">{formErrors.code}</p>
 						{:else}
-							<label class="label">
-								<span class="label-text-alt text-base-content opacity-70">Maksimal 50 karakter, harus unik</span>
-							</label>
+							<p class="label-text-alt text-base-content opacity-70">Maksimal 50 karakter, harus unik</p>
 						{/if}
 					</div>
 
 					<!-- Name -->
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.name}>
 							<span class="label-text text-base-content font-medium">
 								Nama <span class="text-error">*</span>
 								<div class="tooltip tooltip-right" data-tip="Nama komponen yang akan ditampilkan di form payroll. Contoh: Iuran Pensiun, Zakat, Biaya Jabatan">
@@ -489,22 +505,21 @@ const tableSkeletonCols = Array.from({ length: 8 });
 							</span>
 						</label>
 						<input 
+							id={formFieldIds.name}
 							type="text" 
 							placeholder="Contoh: Iuran Pensiun, Zakat, Biaya Jabatan" 
 							class="input input-bordered text-base-content {formErrors.name ? 'input-error' : ''}"
 							bind:value={formData.name}
 						/>
 						{#if formErrors.name}
-							<label class="label">
-								<span class="label-text-alt text-error">{formErrors.name}</span>
-							</label>
+							<p class="label-text-alt text-error">{formErrors.name}</p>
 						{/if}
 					</div>
 
 					<!-- Type & Calculation Type -->
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div class="form-control">
-							<label class="label">
+							<label class="label" for={formFieldIds.type}>
 								<span class="label-text text-base-content font-medium">
 									Tipe <span class="text-error">*</span>
 									<div class="tooltip tooltip-right" data-tip="Wajib: komponen yang harus ada sesuai peraturan PPH21 (iuran pensiun, zakat). Custom: komponen tambahan yang bisa berbeda per tenant">
@@ -515,6 +530,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 								</span>
 							</label>
 							<select 
+								id={formFieldIds.type}
 								class="select select-bordered text-base-content {formErrors.type ? 'select-error' : ''}"
 								bind:value={formData.type}
 							>
@@ -522,19 +538,17 @@ const tableSkeletonCols = Array.from({ length: 8 });
 									<option value={opt.value}>{opt.label}</option>
 								{/each}
 							</select>
-							<label class="label">
-								<span class="label-text-alt text-base-content opacity-70">
-									{#if formData.type === 'mandatory'}
-										Komponen wajib sesuai peraturan PPH21
-									{:else}
-										Komponen tambahan yang bisa dikustomisasi
-									{/if}
-								</span>
-							</label>
+							<p class="label-text-alt text-base-content opacity-70">
+								{#if formData.type === 'mandatory'}
+									Komponen wajib sesuai peraturan PPH21
+								{:else}
+									Komponen tambahan yang bisa dikustomisasi
+								{/if}
+							</p>
 						</div>
 
 						<div class="form-control">
-							<label class="label">
+							<label class="label" for={formFieldIds.calculationType}>
 								<span class="label-text text-base-content font-medium">
 									Tipe Perhitungan <span class="text-error">*</span>
 									<div class="tooltip tooltip-right" data-tip="Auto: dihitung otomatis oleh sistem (contoh: Biaya Jabatan 5% bruto). Manual: user input manual. Percentage: perhitungan persentase">
@@ -545,6 +559,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 								</span>
 							</label>
 							<select 
+								id={formFieldIds.calculationType}
 								class="select select-bordered text-base-content {formErrors.calculation_type ? 'select-error' : ''}"
 								bind:value={formData.calculation_type}
 							>
@@ -552,17 +567,15 @@ const tableSkeletonCols = Array.from({ length: 8 });
 									<option value={opt.value}>{opt.label}</option>
 								{/each}
 							</select>
-							<label class="label">
-								<span class="label-text-alt text-base-content opacity-70">
-									{#if formData.calculation_type === 'auto'}
-										Dihitung otomatis oleh sistem
-									{:else if formData.calculation_type === 'manual'}
-										User input manual di form payroll
-									{:else}
-										Perhitungan berdasarkan persentase
-									{/if}
-								</span>
-							</label>
+							<p class="label-text-alt text-base-content opacity-70">
+								{#if formData.calculation_type === 'auto'}
+									Dihitung otomatis oleh sistem
+								{:else if formData.calculation_type === 'manual'}
+									User input manual di form payroll
+								{:else}
+									Perhitungan berdasarkan persentase
+								{/if}
+							</p>
 						</div>
 					</div>
 				</div>
@@ -574,7 +587,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 					</h4>
 					
 					<div class="form-control">
-						<label class="label">
+						<div class="label">
 							<span class="label-text text-base-content font-medium">
 								Tax Deductible
 								<div class="tooltip tooltip-right" data-tip="Jika aktif, komponen ini dapat dikurangkan dari bruto untuk menghitung neto. Hanya komponen yang tax-deductible yang mengurangi penghasilan kena pajak">
@@ -583,7 +596,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 									</svg>
 								</div>
 							</span>
-						</label>
+						</div>
 						<div class="card bg-base-200 p-4">
 							<label class="cursor-pointer label justify-start gap-4">
 								<input 
@@ -617,7 +630,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<!-- Prioritas -->
 						<div class="form-control">
-							<label class="label">
+							<label class="label" for={formFieldIds.priority}>
 								<span class="label-text text-base-content font-medium">
 									Prioritas
 									<div class="tooltip tooltip-left" data-tip="Urutan tampil: angka kecil = tampil dulu. 0 = pertama.">
@@ -628,6 +641,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 								</span>
 							</label>
 							<input 
+								id={formFieldIds.priority}
 								type="number" 
 								min="0"
 								class="input input-bordered text-base-content"
@@ -637,7 +651,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 
 						<!-- Status Aktif -->
 						<div class="form-control">
-							<label class="label">
+							<div class="label">
 								<span class="label-text text-base-content font-medium">
 									Status Aktif
 									<div class="tooltip tooltip-left" data-tip="Non-aktif: komponen tidak muncul di form payroll. Data tetap tersimpan.">
@@ -646,7 +660,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 										</svg>
 									</div>
 								</span>
-							</label>
+							</div>
 							<div class="card bg-base-200 p-4">
 								<label class="cursor-pointer label justify-start gap-4">
 									<input 
@@ -670,7 +684,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 					</h4>
 					
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.notes}>
 							<span class="label-text text-base-content font-medium">
 								Catatan
 								<div class="tooltip tooltip-right" data-tip="Catatan internal untuk dokumentasi atau penjelasan tentang komponen ini. Contoh: Maksimal 5% dari bruto atau 200rb/bulan">
@@ -681,6 +695,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 							</span>
 						</label>
 						<textarea 
+							id={formFieldIds.notes}
 							class="textarea textarea-bordered text-base-content"
 							placeholder="Catatan tambahan (opsional). Contoh: Maksimal 5% dari bruto atau 200rb/bulan"
 							bind:value={formData.notes}
@@ -707,7 +722,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 				</button>
 			</div>
 		</div>
-		<div class="modal-backdrop" on:click={closeFormModal}></div>
+		<button type="button" class="modal-backdrop" aria-label="Tutup modal" on:click={closeFormModal}></button>
 	</div>
 {/if}
 
@@ -735,7 +750,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 				</button>
 			</div>
 		</div>
-		<div class="modal-backdrop" on:click={cancelDelete}></div>
+		<button type="button" class="modal-backdrop" aria-label="Batalkan hapus" on:click={cancelDelete}></button>
 	</div>
 {/if}
 
