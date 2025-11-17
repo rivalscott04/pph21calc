@@ -5,12 +5,25 @@
 	import { get } from 'svelte/store';
 	import { toast } from '$lib/stores/toast.js';
 
-	let loading = true;
-	let users: TenantUser[] = [];
-	let tenants: Tenant[] = [];
-	let selectedTenantId: number | null = null;
-	let showModal = false;
-	let saving = false;
+let loading = true;
+let users: TenantUser[] = [];
+let tenants: Tenant[] = [];
+let selectedTenantId: number | null = null;
+let showModal = false;
+let saving = false;
+let confirmTenant = false;
+let showPassword = false;
+let passwordManuallyEdited = false;
+let showPasswordMeter = false;
+
+type PasswordStrengthState = {
+	score: number;
+	percent: number;
+	label: string;
+	colorClass: string;
+};
+
+let passwordStrength: PasswordStrengthState = calculatePasswordStrength('');
 
 	// Form state
 	let formData = {
@@ -32,32 +45,48 @@
 		{ value: 'VIEWER', label: 'Viewer / Auditor', description: 'Read-only terhadap laporan dan payroll' }
 	];
 
-	const currentUser = get(auth);
-	const isSuperadmin = currentUser?.user?.is_superadmin ?? false;
+const currentUser = get(auth);
+const isSuperadmin = currentUser?.user?.is_superadmin ?? false;
+let selectedTenant: Partial<Tenant> | null | undefined;
+$: selectedTenant =
+	isSuperadmin
+		? tenants.find((tenant) => tenant.id === (selectedTenantId ?? tenants[0]?.id))
+		: currentUser?.tenant;
+$: showPasswordMeter = passwordManuallyEdited && formData.password.length > 0 && !formErrors.password;
 
-	function openCreateModal() {
-		formData = {
-			name: '',
-			email: '',
-			password: '',
-			role: 'HR',
-			status: 'active'
-		};
-		formErrors = {};
-		showModal = true;
-	}
+function resetPasswordHelpers() {
+	showPassword = false;
+	passwordManuallyEdited = false;
+	updatePasswordStrengthState('');
+}
 
-	function closeModal() {
-		showModal = false;
-		formData = {
-			name: '',
-			email: '',
-			password: '',
-			role: 'HR',
-			status: 'active'
-		};
-		formErrors = {};
-	}
+function openCreateModal() {
+	formData = {
+		name: '',
+		email: '',
+		password: '',
+		role: 'HR',
+		status: 'active'
+	};
+	formErrors = {};
+	confirmTenant = false;
+	resetPasswordHelpers();
+	showModal = true;
+}
+
+function closeModal() {
+	showModal = false;
+	formData = {
+		name: '',
+		email: '',
+		password: '',
+		role: 'HR',
+		status: 'active'
+	};
+	formErrors = {};
+	confirmTenant = false;
+	resetPasswordHelpers();
+}
 
 	function validateForm(): boolean {
 		formErrors = {};
@@ -141,39 +170,168 @@
 		}
 	}
 
-	async function loadUsers() {
-		loading = true;
-		try {
-			let response: any;
-			
-			// If superadmin, use tenant-specific endpoint
-			if (isSuperadmin) {
-				const targetTenantId = selectedTenantId || currentUser?.tenant?.id;
-				if (!targetTenantId) {
-					users = [];
-					loading = false;
-					return;
-				}
-				response = await tenantsApi.listUsers(targetTenantId);
-			} else {
-				// If tenant admin, use my-tenant endpoint
-				response = await tenantsApi.listMyTenantUsers();
+async function loadUsers() {
+	loading = true;
+	try {
+		let response: any;
+		
+		// If superadmin, use tenant-specific endpoint
+		if (isSuperadmin) {
+			const targetTenantId = selectedTenantId || currentUser?.tenant?.id;
+			if (!targetTenantId) {
+				users = [];
+				loading = false;
+				return;
 			}
-			// Handle paginated response or direct array
-			if (Array.isArray(response)) {
-				users = response;
-			} else if (response?.data && Array.isArray(response.data)) {
-				users = response.data;
-			} else {
-				// If response is paginated object, extract data
-				users = response?.data || [];
-			}
-		} catch (error) {
-			console.error('Failed to load users:', error);
-			toast.error('Gagal memuat daftar user');
-			users = [];
+			response = await tenantsApi.listUsers(targetTenantId);
+		} else {
+			// If tenant admin, use my-tenant endpoint
+			response = await tenantsApi.listMyTenantUsers();
 		}
+		// Handle paginated response or direct array
+		if (Array.isArray(response)) {
+			users = response;
+		} else if (response?.data && Array.isArray(response.data)) {
+			users = response.data;
+		} else {
+			// If response is paginated object, extract data
+			users = response?.data || [];
+		}
+	} catch (error) {
+		console.error('Failed to load users:', error);
+		toast.error('Gagal memuat daftar user');
+		users = [];
+	} finally {
+		loading = false;
 	}
+}
+
+function togglePasswordVisibility() {
+	showPassword = !showPassword;
+}
+
+function handlePasswordInput(event: Event) {
+	const target = event.currentTarget as HTMLInputElement;
+	const value = target.value;
+	formData = { ...formData, password: value };
+	passwordManuallyEdited = true;
+	updatePasswordStrengthState(value);
+	clearPasswordError();
+}
+
+function generateSecurePassword(length = 12) {
+	const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	const lower = 'abcdefghijklmnopqrstuvwxyz';
+	const numbers = '0123456789';
+	const symbols = '!@#$%^&*()-_=+[]{};:,.?/|';
+	const all = upper + lower + numbers + symbols;
+
+	const pickChar = (source: string) => source[getRandomInt(source.length)];
+
+	let password = '';
+	password += pickChar(upper);
+	password += pickChar(lower);
+	password += pickChar(numbers);
+	password += pickChar(symbols);
+
+	for (let i = password.length; i < length; i++) {
+		password += pickChar(all);
+	}
+
+	// Secure shuffle (Fisher-Yates)
+	const chars = password.split('');
+	for (let i = chars.length - 1; i > 0; i--) {
+		const j = getRandomInt(i + 1);
+		[chars[i], chars[j]] = [chars[j], chars[i]];
+	}
+
+	return chars.join('');
+}
+
+function handleGeneratePassword() {
+	const generated = generateSecurePassword(12);
+	formData = { ...formData, password: generated };
+	passwordManuallyEdited = false;
+	updatePasswordStrengthState(generated);
+	clearPasswordError();
+	toast.success('Password acak berhasil dibuat');
+}
+
+function updatePasswordStrengthState(password: string) {
+	passwordStrength = calculatePasswordStrength(password);
+}
+
+function calculatePasswordStrength(password: string): PasswordStrengthState {
+	let score = 0;
+	if (password.length >= 8) score++;
+	if (password.length >= 12) score++;
+	if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+	if (/\d/.test(password)) score++;
+	if (/[^A-Za-z0-9]/.test(password)) score++;
+
+	const percent = (score / 5) * 100;
+
+	let label = 'Sangat lemah';
+	let colorClass = 'progress-error';
+
+	if (score >= 4) {
+		label = 'Kuat';
+		colorClass = 'progress-success';
+	} else if (score === 3) {
+		label = 'Sedang';
+		colorClass = 'progress-warning';
+	} else if (score === 2) {
+		label = 'Lemah';
+		colorClass = 'progress-warning';
+	}
+
+	return { score, percent, label, colorClass };
+}
+
+async function copyPassword() {
+	if (!formData.password) return;
+	try {
+		if (typeof navigator !== 'undefined' && navigator?.clipboard?.writeText) {
+			await navigator.clipboard.writeText(formData.password);
+		} else {
+			fallbackCopyToClipboard(formData.password);
+		}
+		toast.success('Password berhasil disalin');
+	} catch (error) {
+		console.error('Failed to copy password:', error);
+		toast.error('Gagal menyalin password');
+	}
+}
+
+function fallbackCopyToClipboard(text: string) {
+	if (typeof document === 'undefined') return;
+	const textarea = document.createElement('textarea');
+	textarea.value = text;
+	textarea.style.position = 'fixed';
+	textarea.style.left = '-9999px';
+	document.body.appendChild(textarea);
+	textarea.focus();
+	textarea.select();
+	document.execCommand('copy');
+	document.body.removeChild(textarea);
+}
+
+function getRandomInt(max: number) {
+	if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+		const array = new Uint32Array(1);
+		crypto.getRandomValues(array);
+		return array[0] % max;
+	}
+	return Math.floor(Math.random() * max);
+}
+
+function clearPasswordError() {
+	if (formErrors.password) {
+		const updatedErrors = { ...formErrors };
+		delete updatedErrors.password;
+		formErrors = updatedErrors;
+	}
+}
 
 	function getRoleLabel(role: string): string {
 		const roleObj = roles.find(r => r.value === role);
@@ -291,6 +449,27 @@
 				<h3 class="text-2xl font-bold text-base-content mb-1">Tambah User Baru</h3>
 				<p class="text-sm text-base-content opacity-60">Buat user baru untuk tenant</p>
 			</div>
+		{#if isSuperadmin}
+			<div class="alert alert-warning mb-4 gap-4">
+				<div class="flex-1">
+					<p class="font-semibold text-base-content">Tenant tujuan</p>
+					<p class="text-base-content">
+						{#if selectedTenant}
+							<span class="font-medium">{selectedTenant.name}</span>
+							{#if selectedTenant?.code}
+								<span class="opacity-60">({selectedTenant.code})</span>
+							{/if}
+						{:else}
+							<span class="text-error">Belum memilih tenant</span>
+						{/if}
+					</p>
+				</div>
+				<label class="label cursor-pointer gap-3">
+					<span class="label-text text-sm text-base-content">Saya sudah mengecek tenant tujuan</span>
+					<input type="checkbox" class="checkbox checkbox-warning" bind:checked={confirmTenant} />
+				</label>
+			</div>
+		{/if}
 
 			<div class="space-y-5">
 				<!-- Name -->
@@ -334,21 +513,64 @@
 					<div class="label pb-1">
 						<span class="label-text font-semibold text-base-content">Password <span class="text-error">*</span></span>
 					</div>
-					<input
-						type="password"
-						class={`input input-bordered w-full text-base-content placeholder:text-base-content/50 ${formErrors.password ? 'input-error' : ''}`}
-						placeholder="Minimal 8 karakter"
-						bind:value={formData.password}
-					/>
-					{#if formErrors.password}
-						<div class="label pt-1 pb-0">
-							<span class="label-text-alt text-error">{formErrors.password}</span>
+					<div class="space-y-2">
+						<div class="flex flex-col gap-2 sm:flex-row">
+							<div class="relative flex-1">
+								<input
+									type={showPassword ? 'text' : 'password'}
+									class={`input input-bordered w-full pr-12 text-base-content placeholder:text-base-content/50 ${formErrors.password ? 'input-error' : ''}`}
+									placeholder="Minimal 8 karakter"
+									value={formData.password}
+									on:input={handlePasswordInput}
+								/>
+								<button
+									type="button"
+									class="btn btn-ghost btn-xs absolute right-2 top-1/2 -translate-y-1/2 text-base-content"
+									on:click={togglePasswordVisibility}
+									aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+								>
+									{#if showPassword}
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18" />
+											<path stroke-linecap="round" stroke-linejoin="round" d="M10.58 10.58A2 2 0 0114 12a2 2 0 01-2 2c-.51 0-.98-.19-1.35-.5" />
+											<path stroke-linecap="round" stroke-linejoin="round" d="M6.53 6.53C4.09 8.25 2.5 10.61 2.5 12c0 1.39 3.73 6.5 9.5 6.5 1.57 0 3-.33 4.29-.9" />
+											<path stroke-linecap="round" stroke-linejoin="round" d="M17.47 17.47C19.91 15.75 21.5 13.39 21.5 12c0-1.39-3.73-6.5-9.5-6.5-1.11 0-2.16.15-3.15.43" />
+										</svg>
+									{:else}
+										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M1.5 12c0 1.39 3.73 6.5 9.5 6.5s9.5-5.11 9.5-6.5-3.73-6.5-9.5-6.5S1.5 10.61 1.5 12z" />
+											<circle cx="11" cy="12" r="3" />
+										</svg>
+									{/if}
+								</button>
+							</div>
+							<button type="button" class="btn btn-outline btn-neutral whitespace-nowrap" on:click={handleGeneratePassword}>
+								Generate
+							</button>
+							{#if formData.password}
+								<button type="button" class="btn btn-ghost btn-neutral whitespace-nowrap" on:click={copyPassword}>
+									Salin
+								</button>
+							{/if}
 						</div>
-					{:else}
-						<div class="label pt-1 pb-0">
-							<span class="label-text-alt text-base-content opacity-50">Minimal 8 karakter</span>
-						</div>
-					{/if}
+						{#if formErrors.password}
+							<div class="label pt-1 pb-0">
+								<span class="label-text-alt text-error">{formErrors.password}</span>
+							</div>
+						{:else if showPasswordMeter}
+							<div class="space-y-1">
+								<progress class={`progress ${passwordStrength.colorClass} w-full`} value={passwordStrength.percent} max="100"></progress>
+								<div class="flex items-center justify-between text-xs text-base-content">
+									<span class="font-semibold">{passwordStrength.label}</span>
+									<span class="opacity-70">{Math.round(passwordStrength.percent)}%</span>
+								</div>
+							</div>
+						{:else}
+							<div class="label pt-1 pb-0">
+								<span class="label-text-alt text-base-content opacity-50">Minimal 8 karakter</span>
+							</div>
+						{/if}
+					</div>
 				</div>
 
 				<!-- Role -->
@@ -382,7 +604,7 @@
 				<button class="btn btn-outline btn-neutral text-base-content" on:click={closeModal} disabled={saving}>
 					Batal
 				</button>
-				<button class="btn btn-success text-white" on:click={saveUser} disabled={saving}>
+			<button class="btn btn-success text-white" on:click={saveUser} disabled={saving || (isSuperadmin && !confirmTenant)}>
 					{#if saving}
 						<span class="loading loading-spinner loading-sm"></span>
 						Menyimpan...

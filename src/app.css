@@ -4,10 +4,6 @@
   themes: light --default, dark --prefersdark, brand;
 }
 
-/* FullCalendar styles */
-@import '@fullcalendar/core/index.css';
-@import '@fullcalendar/daygrid/index.css';
-
 /* FullCalendar custom styling for better readability */
 .fc {
 	color: hsl(0 0% 0%) !important;
