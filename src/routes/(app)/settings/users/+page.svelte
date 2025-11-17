@@ -544,11 +544,11 @@ function clearPasswordError() {
 									{/if}
 								</button>
 							</div>
-							<button type="button" class="btn btn-outline btn-neutral whitespace-nowrap" on:click={handleGeneratePassword}>
+							<button type="button" class="btn btn-outline btn-primary whitespace-nowrap" on:click={handleGeneratePassword}>
 								Generate
 							</button>
 							{#if formData.password}
-								<button type="button" class="btn btn-ghost btn-neutral whitespace-nowrap" on:click={copyPassword}>
+								<button type="button" class="btn btn-ghost text-primary whitespace-nowrap" on:click={copyPassword}>
 									Salin
 								</button>
 							{/if}

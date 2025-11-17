@@ -18,6 +18,23 @@
 	let filterGroup = '';
 	let filterTaxable: boolean | null = null;
 
+const filterIds = {
+	search: 'component-filter-search',
+	group: 'component-filter-group',
+	taxable: 'component-filter-taxable'
+} as const;
+
+const formFieldIds = {
+	code: 'component-form-code',
+	name: 'component-form-name',
+	group: 'component-form-group',
+	taxableToggle: 'component-form-taxable',
+	mandatoryToggle: 'component-form-mandatory',
+	priority: 'component-form-priority',
+	activeToggle: 'component-form-active',
+	notes: 'component-form-notes'
+} as const;
+
 	let showFormModal = false;
 	let formMode: FormMode = 'create';
 	let formData = {
@@ -212,10 +229,11 @@
 		<div class="card-body">
 			<div class="flex flex-wrap gap-4 items-end">
 				<div class="form-control flex-1 min-w-[200px]">
-					<label class="label">
+					<label class="label" for={filterIds.search}>
 						<span class="label-text text-base-content">Cari</span>
 					</label>
 					<input 
+						id={filterIds.search}
 						type="text" 
 						placeholder="Cari kode atau nama..." 
 						class="input input-bordered text-base-content"
@@ -224,10 +242,10 @@
 					/>
 				</div>
 				<div class="form-control min-w-[150px]">
-					<label class="label">
+					<label class="label" for={filterIds.group}>
 						<span class="label-text text-base-content">Grup</span>
 					</label>
-					<select class="select select-bordered text-base-content" bind:value={filterGroup}>
+					<select id={filterIds.group} class="select select-bordered text-base-content" bind:value={filterGroup}>
 						<option value="">Semua</option>
 						{#each groupOptions as opt}
 							<option value={opt.value}>{opt.label}</option>
@@ -235,10 +253,10 @@
 					</select>
 				</div>
 				<div class="form-control min-w-[150px]">
-					<label class="label">
+					<label class="label" for={filterIds.taxable}>
 						<span class="label-text text-base-content">Taxable</span>
 					</label>
-					<select class="select select-bordered text-base-content" bind:value={filterTaxable}>
+					<select id={filterIds.taxable} class="select select-bordered text-base-content" bind:value={filterTaxable}>
 						<option value={null}>Semua</option>
 						<option value={true}>Taxable</option>
 						<option value={false}>Non-Taxable</option>
@@ -374,7 +392,7 @@
 					
 					<!-- Code -->
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.code}>
 							<span class="label-text text-base-content font-medium">
 								Kode <span class="text-error">*</span>
 								<div class="tooltip tooltip-right" data-tip="Kode unik untuk identifikasi komponen. Harus unik per tenant. Contoh: GP001, TUNJ001">
@@ -385,25 +403,26 @@
 							</span>
 						</label>
 						<input 
+							id={formFieldIds.code}
 							type="text" 
 							placeholder="Contoh: GP001, TUNJ001" 
 							class="input input-bordered text-base-content {formErrors.code ? 'input-error' : ''}"
 							bind:value={formData.code}
 						/>
 						{#if formErrors.code}
-							<label class="label">
+							<div class="label">
 								<span class="label-text-alt text-error">{formErrors.code}</span>
-							</label>
+							</div>
 						{:else}
-							<label class="label">
+							<div class="label">
 								<span class="label-text-alt text-base-content opacity-70">Maksimal 50 karakter, harus unik</span>
-							</label>
+							</div>
 						{/if}
 					</div>
 
 					<!-- Name -->
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.name}>
 							<span class="label-text text-base-content font-medium">
 								Nama <span class="text-error">*</span>
 								<div class="tooltip tooltip-right" data-tip="Nama komponen yang akan ditampilkan di form payroll. Contoh: Gaji Pokok, Tunjangan Transport">
@@ -414,21 +433,22 @@
 							</span>
 						</label>
 						<input 
+							id={formFieldIds.name}
 							type="text" 
 							placeholder="Contoh: Gaji Pokok, Tunjangan Transport" 
 							class="input input-bordered text-base-content {formErrors.name ? 'input-error' : ''}"
 							bind:value={formData.name}
 						/>
 						{#if formErrors.name}
-							<label class="label">
+							<div class="label">
 								<span class="label-text-alt text-error">{formErrors.name}</span>
-							</label>
+							</div>
 						{/if}
 					</div>
 
 					<!-- Group -->
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.group}>
 							<span class="label-text text-base-content font-medium">
 								Grup <span class="text-error">*</span>
 								<div class="tooltip tooltip-right" data-tip="Kategori komponen sesuai peraturan PPH21. Gaji Pokok wajib ada, lainnya opsional">
@@ -439,6 +459,7 @@
 							</span>
 						</label>
 						<select 
+							id={formFieldIds.group}
 							class="select select-bordered text-base-content {formErrors.group ? 'select-error' : ''}"
 							bind:value={formData.group}
 						>
@@ -446,11 +467,11 @@
 								<option value={opt.value}>{opt.label}</option>
 							{/each}
 						</select>
-						<label class="label">
+						<div class="label">
 							<span class="label-text-alt text-base-content opacity-70">
 								Pilih kategori sesuai jenis penghasilan
 							</span>
-						</label>
+						</div>
 					</div>
 				</div>
 
@@ -461,7 +482,7 @@
 					</h4>
 					
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.taxableToggle}>
 							<span class="label-text text-base-content font-medium">
 								Taxable
 								<div class="tooltip tooltip-right" data-tip="Jika aktif, komponen ini akan dihitung dalam bruto untuk perhitungan PPh21. Non-taxable tidak masuk perhitungan pajak">
@@ -476,6 +497,7 @@
 								<input 
 									type="checkbox" 
 									class="toggle toggle-primary"
+									id={formFieldIds.taxableToggle}
 									bind:checked={formData.taxable}
 								/>
 								<div>
@@ -501,13 +523,13 @@
 						Pengaturan Tampilan
 					</h4>
 					
-					<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="component-display-settings">
 						<!-- Wajib -->
 						<div class="form-control">
-							<label class="label">
+							<label class="label" for={formFieldIds.mandatoryToggle}>
 								<span class="label-text text-base-content font-medium">
 									Komponen Wajib
-									<div class="tooltip tooltip-left" data-tip="Aktif: komponen wajib diisi saat input payroll. Sistem akan validasi.">
+									<div class="tooltip tooltip-right" data-tip="Aktif: komponen wajib diisi saat input payroll. Sistem akan validasi.">
 										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline ml-1 text-base-content opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 										</svg>
@@ -519,6 +541,7 @@
 									<input 
 										type="checkbox" 
 										class="toggle toggle-primary"
+										id={formFieldIds.mandatoryToggle}
 										bind:checked={formData.is_mandatory}
 									/>
 									<span class="label-text text-base-content font-medium">
@@ -530,10 +553,10 @@
 
 						<!-- Prioritas -->
 						<div class="form-control">
-							<label class="label">
+							<label class="label" for={formFieldIds.priority}>
 								<span class="label-text text-base-content font-medium">
 									Prioritas
-									<div class="tooltip tooltip-left" data-tip="Urutan tampil: angka kecil = tampil dulu. 0 = pertama.">
+									<div class="tooltip tooltip-right" data-tip="Urutan tampil: angka kecil = tampil dulu. 0 = pertama.">
 										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline ml-1 text-base-content opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 										</svg>
@@ -544,13 +567,14 @@
 								type="number" 
 								min="0"
 								class="input input-bordered text-base-content"
+								id={formFieldIds.priority}
 								bind:value={formData.priority}
 							/>
 						</div>
 
 						<!-- Status Aktif -->
 						<div class="form-control">
-							<label class="label">
+							<label class="label" for={formFieldIds.activeToggle}>
 								<span class="label-text text-base-content font-medium">
 									Status Aktif
 									<div class="tooltip tooltip-left" data-tip="Non-aktif: komponen tidak muncul di form payroll. Data tetap tersimpan.">
@@ -565,6 +589,7 @@
 									<input 
 										type="checkbox" 
 										class="toggle toggle-primary"
+										id={formFieldIds.activeToggle}
 										bind:checked={formData.is_active}
 									/>
 									<span class="label-text text-base-content font-medium">
@@ -583,7 +608,7 @@
 					</h4>
 					
 					<div class="form-control">
-						<label class="label">
+						<label class="label" for={formFieldIds.notes}>
 							<span class="label-text text-base-content font-medium">
 								Catatan
 								<div class="tooltip tooltip-right" data-tip="Catatan internal untuk dokumentasi atau penjelasan tentang komponen ini">
@@ -594,6 +619,7 @@
 							</span>
 						</label>
 						<textarea 
+							id={formFieldIds.notes}
 							class="textarea textarea-bordered text-base-content"
 							placeholder="Catatan tambahan (opsional). Contoh: Komponen ini untuk pegawai tetap saja"
 							bind:value={formData.notes}
@@ -620,7 +646,18 @@
 				</button>
 			</div>
 		</div>
-		<div class="modal-backdrop" on:click={closeFormModal}></div>
+		<button
+			type="button"
+			class="modal-backdrop"
+			on:click={closeFormModal}
+			on:keydown={(event) => {
+				if (event.key === 'Enter' || event.key === ' ') {
+					event.preventDefault();
+					closeFormModal();
+				}
+			}}
+			aria-label="Tutup modal"
+		></button>
 	</div>
 {/if}
 

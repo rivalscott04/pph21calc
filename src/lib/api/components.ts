@@ -18,9 +18,11 @@ export interface Component {
 
 export const componentsApi = {
 	async list(params?: {
+		search?: string;
 		group?: string;
 		taxable?: boolean;
 		per_page?: number;
+		page?: number;
 	}): Promise<PaginatedResponse<Component>> {
 		return await apiGet<PaginatedResponse<Component>>('/components', params);
 	},
