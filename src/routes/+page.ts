@@ -4,3 +4,4 @@ export function load() {
 	throw redirect(302, '/dashboard');
 }
 
+
