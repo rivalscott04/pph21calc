@@ -34,6 +34,8 @@ import {
 	let activeTab: 'earnings' | 'deductions' = 'earnings';
 	let searchQuery = '';
 	let filteredEmployments: Employment[] = [];
+const tableSkeletonRows = Array.from({ length: 4 });
+const tableSkeletonCols = Array.from({ length: 6 });
 
 	function formatCurrency(amount: number): string {
 		// Ensure amount is a valid number
@@ -712,8 +714,51 @@ function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHis
 	</div>
 
 	{#if loading}
-		<div class="flex justify-center items-center min-h-[400px]">
-			<span class="loading loading-spinner loading-lg"></span>
+		<div class="space-y-6">
+			<div class="card bg-base-100 shadow-lg">
+				<div class="card-body space-y-3">
+					<div class="skeleton h-6 w-48"></div>
+					<div class="skeleton h-4 w-32"></div>
+					<div class="skeleton h-4 w-24"></div>
+				</div>
+			</div>
+			<div class="tabs tabs-box">
+				<button class="tab" aria-label="Loading earnings tab">
+					<div class="skeleton h-4 w-24"></div>
+				</button>
+				<button class="tab" aria-label="Loading deductions tab">
+					<div class="skeleton h-4 w-24"></div>
+				</button>
+			</div>
+			<div class="form-control">
+				<div class="skeleton h-12 w-full"></div>
+			</div>
+			{#each ['earnings', 'deductions'] as _}
+				<div class="card bg-base-100 shadow-lg">
+					<div class="card-body space-y-4">
+						<div class="flex justify-between items-center">
+							<div class="skeleton h-5 w-32"></div>
+							<div class="flex gap-2">
+								<div class="skeleton h-10 w-32"></div>
+								<div class="skeleton h-10 w-36"></div>
+							</div>
+						</div>
+						<div class="grid grid-cols-6 gap-4">
+							{#each tableSkeletonCols as _, idx}
+								<div class="skeleton h-4 w-full {idx === 0 ? 'col-span-2' : ''}"></div>
+							{/each}
+						</div>
+						{#each tableSkeletonRows as _}
+							<div class="grid grid-cols-6 gap-4">
+								{#each tableSkeletonCols as __}
+									<div class="skeleton h-5 w-full"></div>
+								{/each}
+							</div>
+							<div class="divider my-2"></div>
+						{/each}
+					</div>
+				</div>
+			{/each}
 		</div>
 	{:else if period && period.status === 'posted'}
 		<div class="alert alert-warning">

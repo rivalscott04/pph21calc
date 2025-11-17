@@ -233,15 +233,16 @@ select option {
 }
 
 .menu a:hover, .menu button:hover {
-	background-color: hsl(var(--b3));
-	color: hsl(0 0% 100%) !important; /* Pure white text on hover for maximum readability */
+	background-color: var(--btn-color) !important;
+	color: #ffffff !important; /* Pure white text on hover for maximum readability */
 	font-weight: 600;
 }
 
 .menu a.active, .menu button.active {
-	background-color: hsl(var(--p));
-	color: hsl(var(--pc)) !important;
+	background-color: var(--btn-color) !important;
+	color: #ffffff !important;
 	font-weight: 600;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 /* Ensure menu text is always readable */
@@ -354,6 +355,19 @@ select option {
 .btn-brand:focus svg,
 .btn-brand:focus span {
   color: white !important;
+}
+
+.toggle-brand {
+  --chkbg: var(--btn-color);
+  --chkbg-h: var(--btn-color);
+  --chkfg: #ffffff;
+  --tglbg: hsl(var(--b3));
+  --tglbg-h: hsl(var(--b3));
+}
+
+.toggle-brand:focus-visible {
+  outline: 2px solid var(--btn-color);
+  outline-offset: 2px;
 }
 
 /* Apply custom badge success color to badges with badge-success-brand class */

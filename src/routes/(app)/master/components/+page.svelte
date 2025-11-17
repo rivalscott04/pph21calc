@@ -49,6 +49,8 @@ const formFieldIds = {
 	};
 	let formErrors: Record<string, string> = {};
 	let editingComponent: Component | null = null;
+const tableSkeletonRows = Array.from({ length: 6 });
+const tableSkeletonCols = Array.from({ length: 8 });
 
 	const groupOptions = [
 		{ value: 'gaji_pokok', label: 'Gaji Pokok' },
@@ -262,7 +264,7 @@ const formFieldIds = {
 						<option value={false}>Non-Taxable</option>
 					</select>
 				</div>
-				<button class="btn btn-neutral text-white" on:click={handleSearch}>
+				<button class="btn btn-brand text-white" on:click={handleSearch}>
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
 					</svg>
@@ -276,8 +278,20 @@ const formFieldIds = {
 	<div class="card bg-base-100 shadow-lg">
 		<div class="card-body">
 			{#if loading}
-				<div class="flex justify-center items-center min-h-[200px]">
-					<span class="loading loading-spinner loading-lg"></span>
+				<div class="space-y-4">
+					<div class="grid grid-cols-8 gap-4">
+						{#each tableSkeletonCols as _, colIndex}
+							<div class="skeleton h-4 w-full {colIndex === 0 ? 'col-span-2' : ''}"></div>
+						{/each}
+					</div>
+					{#each tableSkeletonRows as _, rowIndex}
+						<div class="grid grid-cols-8 gap-4">
+							{#each tableSkeletonCols as __}
+								<div class="skeleton h-5 w-full"></div>
+							{/each}
+						</div>
+						<div class="divider my-2"></div>
+					{/each}
 				</div>
 			{:else if components.length === 0}
 				<div class="alert alert-info">
@@ -496,7 +510,7 @@ const formFieldIds = {
 							<label class="cursor-pointer label justify-start gap-4">
 								<input 
 									type="checkbox" 
-									class="toggle toggle-primary"
+									class="toggle toggle-brand"
 									id={formFieldIds.taxableToggle}
 									bind:checked={formData.taxable}
 								/>
@@ -540,7 +554,7 @@ const formFieldIds = {
 								<label class="cursor-pointer label justify-start gap-4">
 									<input 
 										type="checkbox" 
-										class="toggle toggle-primary"
+										class="toggle toggle-brand"
 										id={formFieldIds.mandatoryToggle}
 										bind:checked={formData.is_mandatory}
 									/>
@@ -588,7 +602,7 @@ const formFieldIds = {
 								<label class="cursor-pointer label justify-start gap-4">
 									<input 
 										type="checkbox" 
-										class="toggle toggle-primary"
+										class="toggle toggle-brand"
 										id={formFieldIds.activeToggle}
 										bind:checked={formData.is_active}
 									/>

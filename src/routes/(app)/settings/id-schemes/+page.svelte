@@ -12,11 +12,14 @@
 	let saving = false;
 	let showDeleteModal = false;
 	let schemeToDelete: IdentifierScheme | null = null;
+const tableSkeletonRows = Array.from({ length: 6 });
+const tableSkeletonCols = Array.from({ length: 6 });
 
 	// Form state
 	let formData = {
 		code: '',
 		label: '',
+		entity_type: '',
 		prefix: '', // Prefix untuk ID (contoh: "NTB")
 		format_type: 'NUMERIC', // NUMERIC atau ALPHANUMERIC
 		length_min: '',
@@ -42,12 +45,20 @@ let codeInputWarning = '';
 		{ value: 'UPPER', label: 'Huruf besar' }
 	];
 
+	const entityTypeOptions = [
+		{ value: 'BANK', label: 'Bank / Institusi Keuangan' },
+		{ value: 'BUMN', label: 'BUMN / Anak Perusahaan' },
+		{ value: 'KAMPUS', label: 'Perguruan Tinggi' },
+		{ value: 'LAINNYA', label: 'Lainnya' }
+	];
+
 
 	function openCreateModal() {
 		editingScheme = null;
 		formData = {
 			code: '',
 			label: '',
+			entity_type: '',
 			prefix: '',
 			format_type: 'NUMERIC',
 			length_min: '',
@@ -70,6 +81,7 @@ let codeInputWarning = '';
 		formData = {
 			code: scheme.code,
 			label: scheme.label,
+			entity_type: scheme.entity_type || '',
 			prefix: scheme.prefix || '',
 			format_type: formatType,
 			length_min: scheme.length_min?.toString() || '',
@@ -86,6 +98,7 @@ let codeInputWarning = '';
 		formData = {
 			code: '',
 			label: '',
+			entity_type: '',
 			prefix: '',
 			format_type: 'NUMERIC',
 			length_min: '',
@@ -106,6 +119,10 @@ let codeInputWarning = '';
 
 		if (!formData.label.trim()) {
 			formErrors.label = 'Label wajib diisi';
+		}
+
+		if (!formData.entity_type.trim()) {
+			formErrors.entity_type = 'Tipe entity wajib dipilih';
 		}
 
 		if (!formData.prefix.trim()) {
@@ -206,6 +223,7 @@ let codeInputWarning = '';
 		const schemeData: any = {
 			code: formData.code.trim().toUpperCase(),
 			label: formData.label.trim(),
+			entity_type: formData.entity_type.trim().toUpperCase(),
 			prefix: formData.prefix.trim().toUpperCase(),
 			format_type: formData.format_type,
 			length_min: parseInt(formData.length_min),
@@ -302,8 +320,26 @@ let codeInputWarning = '';
 	</div>
 
 	{#if loading}
-		<div class="flex justify-center items-center min-h-[400px]">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+		<div class="card bg-base-100 shadow-lg">
+			<div class="card-body space-y-4">
+				<div class="flex justify-between items-center">
+					<div class="skeleton h-6 w-48"></div>
+					<div class="skeleton h-10 w-32"></div>
+				</div>
+				<div class="grid grid-cols-6 gap-4">
+					{#each tableSkeletonCols as _, idx}
+						<div class="skeleton h-4 w-full {idx === 0 ? 'col-span-2' : ''}"></div>
+					{/each}
+				</div>
+				{#each tableSkeletonRows as _}
+					<div class="grid grid-cols-6 gap-4">
+						{#each tableSkeletonCols as __}
+							<div class="skeleton h-5 w-full"></div>
+						{/each}
+					</div>
+					<div class="divider my-2"></div>
+				{/each}
+			</div>
 		</div>
 	{:else}
 		<!-- Schemes List -->
@@ -442,6 +478,31 @@ let codeInputWarning = '';
 					{#if formErrors.label}
 						<div class="label pt-1 pb-0">
 							<span class="label-text-alt text-error">{formErrors.label}</span>
+						</div>
+					{/if}
+				</div>
+
+				<!-- Entity Type -->
+				<div class="form-control">
+					<div class="label pb-1">
+						<span class="label-text font-semibold text-base-content">Tipe Entity <span class="text-error">*</span></span>
+					</div>
+					<select
+						class={`select select-bordered w-full text-base-content ${formErrors.entity_type ? 'select-error' : ''}`}
+						bind:value={formData.entity_type}
+					>
+						<option value="" disabled>Pilih tipe entity</option>
+						{#each entityTypeOptions as option}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+					{#if formErrors.entity_type}
+						<div class="label pt-1 pb-0">
+							<span class="label-text-alt text-error">{formErrors.entity_type}</span>
+						</div>
+					{:else}
+						<div class="label pt-1 pb-0">
+							<span class="label-text-alt text-base-content opacity-50">Kategori membantu filter laporan dan integrasi</span>
 						</div>
 					{/if}
 				</div>

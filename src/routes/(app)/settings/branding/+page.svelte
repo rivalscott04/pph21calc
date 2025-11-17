@@ -112,8 +112,20 @@
 	</div>
 
 	{#if loading}
-		<div class="flex justify-center items-center min-h-[400px]">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+			{#each Array.from({ length: 2 }) as _}
+				<div class="card bg-base-100 shadow-lg">
+					<div class="card-body space-y-4">
+						<div class="skeleton h-6 w-48"></div>
+						{#each Array.from({ length: 6 }) as __}
+							<div class="space-y-2">
+								<div class="skeleton h-4 w-32"></div>
+								<div class="skeleton h-12 w-full"></div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/each}
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -498,7 +510,7 @@
 						<!-- Action Buttons -->
 						<div class="flex gap-3 pt-4">
 							<button
-								class="btn btn-success flex-1 text-white"
+								class="btn btn-brand flex-1 text-white"
 								on:click={saveColors}
 								disabled={saving}
 							>
@@ -513,7 +525,7 @@
 								{/if}
 							</button>
 							<button
-								class="btn btn-ghost"
+								class="btn btn-ghost text-base-content"
 								on:click={resetToDefault}
 							>
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -41,6 +41,8 @@
 	let identifierSaving = false;
 
 	const perPageOptions = [10, 25, 50];
+const tableSkeletonRows = Array.from({ length: 6 });
+const tableSkeletonCols = Array.from({ length: 5 });
 
 	onMount(async () => {
 		await Promise.all([loadPersons(), loadIdentifierSchemes()]);
@@ -376,8 +378,22 @@
 	</div>
 
 	{#if loading}
-		<div class="flex justify-center items-center min-h-[400px]">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+		<div class="card bg-base-100 shadow">
+			<div class="card-body space-y-4">
+				<div class="grid grid-cols-5 gap-4">
+					{#each tableSkeletonCols as _, colIndex}
+						<div class="skeleton h-4 w-full {colIndex === 0 ? 'col-span-2' : ''}"></div>
+					{/each}
+				</div>
+				{#each tableSkeletonRows as _}
+					<div class="grid grid-cols-5 gap-4">
+						{#each tableSkeletonCols as __}
+							<div class="skeleton h-5 w-full"></div>
+						{/each}
+					</div>
+					<div class="divider my-2"></div>
+				{/each}
+			</div>
 		</div>
 	{:else}
 		<div class="card bg-base-100 shadow">

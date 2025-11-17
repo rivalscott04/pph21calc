@@ -308,6 +308,7 @@ class ConfigController extends Controller
         $validated = $request->validate([
             'code' => 'required|string|max:50',
             'label' => 'required|string|max:255',
+            'entity_type' => 'required|string|max:100',
             'prefix' => 'required|string|max:20', // Prefix wajib (contoh: "NTB")
             'format_type' => 'required|string|in:NUMERIC,ALPHANUMERIC', // Format bagian belakang
             'length_min' => 'required|integer|min:1',
@@ -346,7 +347,7 @@ class ConfigController extends Controller
             'code' => $validated['code'],
             'label' => $validated['label'],
             'prefix' => strtoupper($validated['prefix']), // Simpan uppercase
-            'entity_type' => null,
+            'entity_type' => strtoupper($validated['entity_type']),
             'regex_pattern' => $regexPattern,
             'length_min' => $validated['length_min'],
             'length_max' => $validated['length_max'],
@@ -400,6 +401,7 @@ class ConfigController extends Controller
         $validated = $request->validate([
             'code' => ['sometimes', 'string', 'max:50', Rule::unique('identifier_schemes')->where('tenant_id', $scheme->tenant_id)->ignore($scheme->id)],
             'label' => 'sometimes|string|max:255',
+            'entity_type' => 'sometimes|string|max:100',
             'prefix' => 'sometimes|string|max:20',
             'format_type' => 'sometimes|string|in:NUMERIC,ALPHANUMERIC',
             'length_min' => 'nullable|integer|min:1',
@@ -433,6 +435,10 @@ class ConfigController extends Controller
         
         if (isset($validated['prefix'])) {
             $validated['prefix'] = strtoupper($validated['prefix']);
+        }
+
+        if (isset($validated['entity_type'])) {
+            $validated['entity_type'] = strtoupper($validated['entity_type']);
         }
 
         $scheme->update($validated);

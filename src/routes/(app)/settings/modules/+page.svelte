@@ -6,6 +6,8 @@
 	let loading = true;
 	let saving = false;
 	let form: ModuleConfig | null = null;
+const skeletonSections = Array.from({ length: 4 });
+const skeletonItems = Array.from({ length: 2 });
 
 	const unsubscribe = modules.subscribe(($modules) => {
 		if ($modules) {
@@ -147,8 +149,26 @@
 	</div>
 
 	{#if loading || !form}
-		<div class="flex justify-center items-center min-h-[280px]">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+		<div class="grid gap-6">
+			{#each skeletonSections as _}
+				<div class="card bg-base-100 shadow">
+					<div class="card-body space-y-4">
+						<div class="space-y-2">
+							<div class="skeleton h-6 w-48"></div>
+							<div class="skeleton h-4 w-64"></div>
+						</div>
+						<div class="space-y-4">
+							{#each skeletonItems as __}
+								<div class="p-4 border border-base-300 rounded-2xl space-y-3">
+									<div class="skeleton h-4 w-40"></div>
+									<div class="skeleton h-3 w-full"></div>
+									<div class="skeleton h-10 w-32 ml-auto"></div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				</div>
+			{/each}
 		</div>
 	{:else}
 		<div class="grid gap-6">
@@ -176,7 +196,7 @@
 										<span class="text-sm font-semibold text-base-content">{form[item.key] ? 'Aktif' : 'Nonaktif'}</span>
 										<input
 											type="checkbox"
-											class="toggle toggle-primary"
+											class="toggle toggle-brand"
 											checked={form[item.key]}
 											on:change={() => toggleModule(item.key)}
 											disabled={item.disabled || saving}

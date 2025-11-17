@@ -54,6 +54,11 @@
 		value: i + 1,
 		label: new Date(2024, i).toLocaleString('id-ID', { month: 'long' })
 	}));
+const employeeTableSkeletonRows = Array.from({ length: 6 });
+const employeeTableSkeletonCols = Array.from({ length: 7 });
+const previewSkeletonStats = Array.from({ length: 3 });
+const resultSkeletonRows = Array.from({ length: 5 });
+const resultSkeletonCols = Array.from({ length: 6 });
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('id-ID', {
@@ -1316,8 +1321,20 @@ function buildDeductionsBreakdownPayload(
 				</div>
 
 				{#if loadingEmployees}
-					<div class="flex justify-center items-center py-12">
-						<span class="loading loading-spinner loading-lg text-primary"></span>
+					<div class="space-y-4">
+						<div class="grid grid-cols-7 gap-4">
+							{#each employeeTableSkeletonCols as _}
+								<div class="skeleton h-4 w-full"></div>
+							{/each}
+						</div>
+						{#each employeeTableSkeletonRows as _}
+							<div class="grid grid-cols-7 gap-4">
+								{#each employeeTableSkeletonCols as __}
+									<div class="skeleton h-5 w-full"></div>
+								{/each}
+							</div>
+							<div class="divider my-2"></div>
+						{/each}
 					</div>
 				{:else}
 					<div class="overflow-x-auto">
@@ -1794,8 +1811,13 @@ function buildDeductionsBreakdownPayload(
 							<!-- Quick Result Preview (Real-time) -->
 							{#if employee.previewLoading}
 								<div class="mt-4 pt-4 border-t border-base-300">
-									<div class="flex justify-center">
-										<span class="loading loading-spinner loading-sm text-primary"></span>
+									<div class="grid grid-cols-3 gap-2">
+										{#each previewSkeletonStats as _}
+											<div class="stat bg-base-200 rounded-lg p-3 space-y-2">
+												<div class="skeleton h-3 w-24"></div>
+												<div class="skeleton h-5 w-20"></div>
+											</div>
+										{/each}
 									</div>
 								</div>
 							{:else if employee.preview}
@@ -1871,13 +1893,45 @@ function buildDeductionsBreakdownPayload(
 	<!-- Step 3: Hasil Perhitungan -->
 	{#if currentStep === 3}
 		{#if loading}
+		<div class="space-y-6">
 			<div class="card bg-base-100 shadow-lg">
-				<div class="card-body">
-					<div class="flex justify-center items-center py-12">
-						<span class="loading loading-spinner loading-lg text-primary"></span>
+				<div class="card-body space-y-3">
+					<div class="skeleton h-6 w-48"></div>
+					<div class="flex flex-wrap gap-2">
+						{#each Array.from({ length: 4 }) as _}
+							<div class="skeleton h-8 w-32 rounded-full"></div>
+						{/each}
 					</div>
 				</div>
 			</div>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+				{#each Array.from({ length: 2 }) as _}
+					<div class="stat bg-base-100 shadow-lg rounded-lg border border-base-300 space-y-2 p-4">
+						<div class="skeleton h-4 w-24"></div>
+						<div class="skeleton h-6 w-32"></div>
+						<div class="skeleton h-4 w-28"></div>
+					</div>
+				{/each}
+			</div>
+			<div class="card bg-base-100 shadow-lg">
+				<div class="card-body space-y-3">
+					<div class="skeleton h-6 w-56"></div>
+					<div class="grid grid-cols-6 gap-4">
+						{#each resultSkeletonCols as _, colIndex}
+							<div class="skeleton h-4 w-full {colIndex === 0 ? 'col-span-2' : ''}"></div>
+						{/each}
+					</div>
+					{#each resultSkeletonRows as _}
+						<div class="grid grid-cols-6 gap-4">
+							{#each resultSkeletonCols as __}
+								<div class="skeleton h-5 w-full"></div>
+							{/each}
+						</div>
+						<div class="divider my-2"></div>
+					{/each}
+				</div>
+			</div>
+		</div>
 		{:else if batchResult && batchResult.results.length > 0}
 			<div class="space-y-6">
 				<!-- Header dengan Info Periode -->

@@ -15,6 +15,8 @@ let confirmTenant = false;
 let showPassword = false;
 let passwordManuallyEdited = false;
 let showPasswordMeter = false;
+const tableSkeletonRows = Array.from({ length: 6 });
+const tableSkeletonCols = Array.from({ length: 5 });
 
 type PasswordStrengthState = {
 	score: number;
@@ -386,8 +388,26 @@ function clearPasswordError() {
 	{/if}
 
 	{#if loading}
-		<div class="flex justify-center items-center min-h-[400px]">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+		<div class="card bg-base-100 shadow-lg">
+			<div class="card-body space-y-4">
+				<div class="flex justify-between">
+					<div class="skeleton h-6 w-40"></div>
+					<div class="skeleton h-10 w-32"></div>
+				</div>
+				<div class="grid grid-cols-5 gap-4">
+					{#each tableSkeletonCols as _, idx}
+						<div class="skeleton h-4 w-full {idx === 0 ? 'col-span-2' : ''}"></div>
+					{/each}
+				</div>
+				{#each tableSkeletonRows as _}
+					<div class="grid grid-cols-5 gap-4">
+						{#each tableSkeletonCols as __}
+							<div class="skeleton h-5 w-full"></div>
+						{/each}
+					</div>
+					<div class="divider my-2"></div>
+				{/each}
+			</div>
 		</div>
 	{:else}
 		<!-- Users List -->

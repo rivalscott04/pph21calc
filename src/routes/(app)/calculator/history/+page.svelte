@@ -8,6 +8,8 @@
 	let employees: EmployeeHistoryListItem[] = [];
 	let selectedYear: number | null = null;
 	let currentYear = new Date().getFullYear();
+const tableSkeletonRows = Array.from({ length: 6 });
+const tableSkeletonCols = Array.from({ length: 6 });
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('id-ID', {
@@ -73,8 +75,20 @@
 	<div class="card bg-base-100 shadow-lg">
 		<div class="card-body">
 			{#if loadingHistory}
-				<div class="flex justify-center items-center py-12">
-					<span class="loading loading-spinner loading-lg text-primary"></span>
+				<div class="space-y-4">
+					<div class="grid grid-cols-6 gap-4">
+						{#each tableSkeletonCols as _, colIndex}
+							<div class="skeleton h-4 w-full {colIndex === 1 ? 'col-span-2' : ''}"></div>
+						{/each}
+					</div>
+					{#each tableSkeletonRows as _}
+						<div class="grid grid-cols-6 gap-4">
+							{#each tableSkeletonCols as __}
+								<div class="skeleton h-5 w-full"></div>
+							{/each}
+						</div>
+						<div class="divider my-2"></div>
+					{/each}
 				</div>
 			{:else if employees.length > 0}
 				<div class="overflow-x-auto">

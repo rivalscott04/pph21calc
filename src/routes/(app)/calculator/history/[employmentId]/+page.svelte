@@ -16,6 +16,7 @@
 	let calendarOptions: any = null;
 	let calendarEvents: EventInput[] = [];
 	let viewMode: 'month' | 'day' = 'month'; // 'month' = list bulanan, 'day' = kalender harian
+const periodSkeletonRows = Array.from({ length: 5 });
 
 	$: employmentId = parseInt($page.params.employmentId || '0');
 	$: year = parseInt($page.url.searchParams.get('year') || new Date().getFullYear().toString());
@@ -173,8 +174,54 @@
 	</button>
 
 	{#if loading}
-		<div class="flex justify-center items-center py-12">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+		<div class="space-y-6">
+			<div class="card bg-base-100 shadow-xl rounded-xl border border-base-300">
+				<div class="card-body flex flex-col sm:flex-row gap-6">
+					<div class="skeleton h-20 w-20 rounded-full"></div>
+					<div class="flex-1 space-y-3">
+						<div class="skeleton h-6 w-48"></div>
+						<div class="grid grid-cols-2 gap-3">
+							{#each Array.from({ length: 4 }) as _}
+								<div class="skeleton h-4 w-full"></div>
+							{/each}
+						</div>
+						<div class="flex flex-wrap gap-2">
+							{#each Array.from({ length: 3 }) as _}
+								<div class="skeleton h-8 w-24 rounded-full"></div>
+							{/each}
+						</div>
+					</div>
+					<div class="space-y-3">
+						{#each Array.from({ length: 3 }) as _}
+							<div class="skeleton h-10 w-32"></div>
+						{/each}
+					</div>
+				</div>
+			</div>
+			<div class="bg-base-100 rounded-xl border border-base-300 shadow-lg p-6 space-y-4">
+				<div class="skeleton h-6 w-56"></div>
+				<div class="flex flex-wrap gap-3">
+					{#each Array.from({ length: 3 }) as _}
+						<div class="skeleton h-8 w-32 rounded"></div>
+					{/each}
+				</div>
+				<div class="space-y-3">
+					{#each periodSkeletonRows as _}
+						<div class="card bg-base-100 border border-base-300">
+							<div class="card-body p-4 flex flex-col sm:flex-row justify-between gap-4">
+								<div class="space-y-2 flex-1">
+									<div class="skeleton h-5 w-40"></div>
+									<div class="skeleton h-4 w-32"></div>
+								</div>
+								<div class="space-y-2 text-right">
+									<div class="skeleton h-4 w-24"></div>
+									<div class="skeleton h-6 w-32"></div>
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
 		</div>
 	{:else if detail}
 		<!-- Employee Profile Card -->

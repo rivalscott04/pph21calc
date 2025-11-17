@@ -14,6 +14,9 @@
 	let recentActivities: any[] = [];
 	let loading = true;
 	let chartsLoading = true;
+const summarySkeletonCards = Array.from({ length: 4 });
+const chartSkeletonItems = Array.from({ length: 5 });
+const activitySkeletonRows = Array.from({ length: 6 });
 
 	// Format currency
 	function formatCurrency(amount: number): string {
@@ -85,8 +88,57 @@
 	</div>
 
 	{#if loading}
-		<div class="flex justify-center items-center min-h-[400px]">
-			<span class="loading loading-spinner loading-lg text-primary"></span>
+		<div class="space-y-6">
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+				{#each summarySkeletonCards as _}
+					<div class="stat bg-base-200 rounded-lg shadow space-y-3">
+						<div class="skeleton h-8 w-8 rounded-full"></div>
+						<div class="skeleton h-4 w-24"></div>
+						<div class="skeleton h-8 w-32"></div>
+						<div class="skeleton h-4 w-20"></div>
+					</div>
+				{/each}
+			</div>
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+				{#each Array.from({ length: 3 }) as _}
+					<div class="stat bg-base-200 rounded-lg shadow space-y-3">
+						<div class="skeleton h-4 w-24"></div>
+						<div class="skeleton h-8 w-20"></div>
+						<div class="skeleton h-4 w-16"></div>
+					</div>
+				{/each}
+			</div>
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				{#each Array.from({ length: 2 }) as _}
+					<div class="card bg-base-100 shadow-lg">
+						<div class="card-body space-y-4">
+							<div class="skeleton h-6 w-40"></div>
+							{#each chartSkeletonItems as __}
+								<div class="flex items-center gap-4">
+									<div class="skeleton h-4 w-16"></div>
+									<div class="flex-1">
+										<div class="skeleton h-3 w-full"></div>
+									</div>
+									<div class="skeleton h-4 w-24"></div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+			<div class="card bg-base-100 shadow-lg">
+				<div class="card-body space-y-3">
+					<div class="skeleton h-6 w-48"></div>
+					{#each activitySkeletonRows as _}
+						<div class="grid grid-cols-4 gap-4">
+							<div class="skeleton h-4 w-full"></div>
+							<div class="skeleton h-4 w-full"></div>
+							<div class="skeleton h-4 w-full"></div>
+							<div class="skeleton h-4 w-full"></div>
+						</div>
+					{/each}
+				</div>
+			</div>
 		</div>
 	{:else if summary}
 		<!-- Summary Cards -->
@@ -162,9 +214,22 @@
 		<!-- Charts Row -->
 		<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 			{#if chartsLoading}
-				<div class="col-span-2 flex justify-center items-center py-12">
-					<span class="loading loading-spinner loading-lg text-primary"></span>
-				</div>
+				{#each Array.from({ length: 2 }) as _}
+					<div class="card bg-base-100 shadow-lg">
+						<div class="card-body space-y-4">
+							<div class="skeleton h-6 w-48"></div>
+							{#each chartSkeletonItems as __}
+								<div class="flex items-center gap-4">
+									<div class="skeleton h-4 w-16"></div>
+									<div class="flex-1">
+										<div class="skeleton h-3 w-full"></div>
+									</div>
+									<div class="skeleton h-4 w-20"></div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
 			{:else}
 				<!-- PPh21 Monthly Chart -->
 				{#if pph21Chart}
@@ -229,45 +294,59 @@
 		<div class="card bg-base-100 shadow-lg">
 			<div class="card-body">
 				<h2 class="card-title text-base-content">Aktivitas Terbaru</h2>
-				<div class="overflow-x-auto">
-					<table class="table table-zebra">
-						<thead>
-							<tr>
-								<th class="text-base-content">Waktu</th>
-								<th class="text-base-content">User</th>
-								<th class="text-base-content">Aksi</th>
-								<th class="text-base-content">Tabel</th>
-								<th class="text-base-content">Record ID</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#if recentActivities.length > 0}
-								{#each recentActivities as activity}
-									{@const actionInfo = getActionInfo(activity.action)}
-									<tr>
-										<td class="text-base-content opacity-70">
-											{new Date(activity.created_at).toLocaleString('id-ID')}
-										</td>
-										<td class="text-base-content">{activity.user?.name || activity.user?.email || 'System'}</td>
-										<td>
-											<span class="badge {actionInfo.badgeClass}">
-												{actionInfo.label}
-											</span>
-										</td>
-										<td class="text-base-content opacity-70">{activity.table_name}</td>
-										<td class="text-base-content opacity-70 text-sm">{activity.record_id || '-'}</td>
-									</tr>
-								{/each}
-							{:else}
+				{#if chartsLoading}
+					<div class="space-y-3 mt-4">
+						{#each activitySkeletonRows as _}
+							<div class="grid grid-cols-5 gap-4">
+								<div class="skeleton h-4 w-full"></div>
+								<div class="skeleton h-4 w-full"></div>
+								<div class="skeleton h-4 w-full"></div>
+								<div class="skeleton h-4 w-full"></div>
+								<div class="skeleton h-4 w-full"></div>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<div class="overflow-x-auto">
+						<table class="table table-zebra">
+							<thead>
 								<tr>
-									<td colspan="5" class="text-center text-base-content opacity-50 py-8">
-										Tidak ada aktivitas terbaru
-									</td>
+									<th class="text-base-content">Waktu</th>
+									<th class="text-base-content">User</th>
+									<th class="text-base-content">Aksi</th>
+									<th class="text-base-content">Tabel</th>
+									<th class="text-base-content">Record ID</th>
 								</tr>
-							{/if}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody>
+								{#if recentActivities.length > 0}
+									{#each recentActivities as activity}
+										{@const actionInfo = getActionInfo(activity.action)}
+										<tr>
+											<td class="text-base-content opacity-70">
+												{new Date(activity.created_at).toLocaleString('id-ID')}
+											</td>
+											<td class="text-base-content">{activity.user?.name || activity.user?.email || 'System'}</td>
+											<td>
+												<span class="badge {actionInfo.badgeClass}">
+													{actionInfo.label}
+												</span>
+											</td>
+											<td class="text-base-content opacity-70">{activity.table_name}</td>
+											<td class="text-base-content opacity-70 text-sm">{activity.record_id || '-'}</td>
+										</tr>
+									{/each}
+								{:else}
+									<tr>
+										<td colspan="5" class="text-center text-base-content opacity-50 py-8">
+											Tidak ada aktivitas terbaru
+										</td>
+									</tr>
+								{/if}
+							</tbody>
+						</table>
+					</div>
+				{/if}
 			</div>
 		</div>
 		{/if}

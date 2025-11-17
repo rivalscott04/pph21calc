@@ -13,6 +13,8 @@
 	let showExportModal = false;
 	let exportData: any = null;
 	let showUploadConfirmModal = false;
+const logSkeletonRows = Array.from({ length: 6 });
+const logSkeletonCols = Array.from({ length: 5 });
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('id-ID', {
@@ -230,8 +232,20 @@
 				<div class="card-body">
 					<h2 class="card-title text-base-content">Log CoreTax</h2>
 					{#if loading}
-						<div class="flex justify-center items-center py-12">
-							<span class="loading loading-spinner loading-lg text-primary"></span>
+						<div class="space-y-4 mt-4">
+							<div class="grid grid-cols-5 gap-4">
+								{#each logSkeletonCols as _}
+									<div class="skeleton h-4 w-full"></div>
+								{/each}
+							</div>
+							{#each logSkeletonRows as _}
+								<div class="grid grid-cols-5 gap-4">
+									{#each logSkeletonCols as __}
+										<div class="skeleton h-5 w-full"></div>
+									{/each}
+								</div>
+								<div class="divider my-2"></div>
+							{/each}
 						</div>
 					{:else if logs.length > 0}
 						<div class="overflow-x-auto mt-4">
