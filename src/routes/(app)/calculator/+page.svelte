@@ -80,6 +80,24 @@
 		return isNaN(num) ? 0 : Math.floor(num);
 	}
 
+function getMonthlyAnnualAmounts(
+	value: number,
+	mode: 'monthly' | 'yearly'
+): { monthlyAmount: number; annualAmount: number } {
+	const safeValue = Math.max(0, Math.round(value));
+	if (mode === 'monthly') {
+		return {
+			monthlyAmount: safeValue,
+			annualAmount: safeValue * 12
+		};
+	}
+
+	return {
+		monthlyAmount: Math.max(0, Math.round(safeValue / 12)),
+		annualAmount: safeValue
+	};
+}
+
 	// Handle input with auto-formatting
 	function handleCurrencyInput(employmentId: number, field: keyof BatchCalculationItem | 'zakat', event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
@@ -1006,6 +1024,110 @@
 		return batchResult.results.find((r) => r.employment_id === employmentId);
 	}
 
+function buildEarningsBreakdownPayload(
+	employmentId: number,
+	mode: 'monthly' | 'yearly'
+) {
+	const employee = selectedEmployees.get(employmentId);
+	if (!employee || !employee.earnings || employee.earnings.size === 0) {
+		return [];
+	}
+
+	const breakdown: Array<{
+		component_id: number;
+		monthly_amount: number;
+		annual_amount: number;
+	}> = [];
+
+	employee.earnings.forEach((amount, componentId) => {
+		const numericAmount = Number(amount) || 0;
+		if (numericAmount <= 0) {
+			return;
+		}
+		const { monthlyAmount, annualAmount } = getMonthlyAnnualAmounts(numericAmount, mode);
+		breakdown.push({
+			component_id: componentId,
+			monthly_amount: monthlyAmount,
+			annual_amount: annualAmount
+		});
+	});
+
+	return breakdown;
+}
+
+function buildDeductionsBreakdownPayload(
+	employmentId: number,
+	mode: 'monthly' | 'yearly'
+) {
+	const employee = selectedEmployees.get(employmentId);
+	if (!employee) {
+		return [];
+	}
+
+	const deductionMap = new Map<number, number>();
+
+	if (employee.deductions) {
+		employee.deductions.forEach((amount, deductionId) => {
+			if ((Number(amount) || 0) > 0) {
+				deductionMap.set(deductionId, Number(amount));
+			}
+		});
+	}
+
+	// Ensure special components are captured even if not in the map
+	const biayaJabatanComponent = deductionComponents.find((dc) => isBiayaJabatan(dc));
+	if (
+		biayaJabatanComponent &&
+		employee.calcData.biaya_jabatan &&
+		!deductionMap.has(biayaJabatanComponent.id)
+	) {
+		deductionMap.set(biayaJabatanComponent.id, employee.calcData.biaya_jabatan);
+	}
+
+	const iuranPensiunComponent = deductionComponents.find((dc) => isIuranPensiun(dc));
+	if (
+		iuranPensiunComponent &&
+		employee.calcData.iuran_pensiun &&
+		!deductionMap.has(iuranPensiunComponent.id)
+	) {
+		deductionMap.set(iuranPensiunComponent.id, employee.calcData.iuran_pensiun);
+	}
+
+	const zakatComponent = deductionComponents.find((dc) => isZakat(dc));
+	if (
+		zakatComponent &&
+		employee.calcData.zakat &&
+		!deductionMap.has(zakatComponent.id)
+	) {
+		deductionMap.set(zakatComponent.id, employee.calcData.zakat);
+	}
+
+	if (deductionMap.size === 0) {
+		return [];
+	}
+
+	const breakdown: Array<{
+		deduction_component_id: number;
+		monthly_amount: number;
+		annual_amount: number;
+	}> = [];
+
+	deductionMap.forEach((amount, deductionId) => {
+		const numericAmount = Number(amount) || 0;
+		if (numericAmount <= 0) {
+			return;
+		}
+		const { monthlyAmount, annualAmount } = getMonthlyAnnualAmounts(numericAmount, mode);
+		breakdown.push({
+			deduction_component_id: deductionId,
+			monthly_amount: monthlyAmount,
+			annual_amount: annualAmount
+		});
+	});
+
+	return breakdown;
+}
+
 	async function saveToHistory() {
 		if (selectedEmployees.size === 0 || !batchResult) {
 			toast.error('Tidak ada perhitungan untuk disimpan');
@@ -1014,23 +1136,31 @@
 
 		savingHistory = true;
 		try {
-			const calculations = batchResult.results.map(result => ({
-				employment_id: result.employment_id,
-				person_name: result.person_name,
-				ptkp_code: result.ptkp_code,
-				has_npwp: result.has_npwp,
-				year: year,
-				month: month,
-				bruto: result.bruto,
-				biaya_jabatan: result.biaya_jabatan,
-				iuran_pensiun: result.iuran_pensiun,
-				zakat: result.zakat,
-				neto_masa: result.neto_masa,
-				ptkp_yearly: result.ptkp_yearly,
-				pkp_annualized: result.pkp_annualized,
-				pph21_masa: result.pph21_masa,
-				notes: result.notes || null
-			}));
+			const calculations = batchResult.results.map(result => {
+				const earningsBreakdown = buildEarningsBreakdownPayload(result.employment_id, calculationMode);
+				const deductionsBreakdown = buildDeductionsBreakdownPayload(result.employment_id, calculationMode);
+
+				return {
+					employment_id: result.employment_id,
+					person_name: result.person_name,
+					ptkp_code: result.ptkp_code,
+					has_npwp: result.has_npwp,
+					year: year,
+					month: month,
+					calculation_mode: calculationMode,
+					bruto: result.bruto,
+					biaya_jabatan: result.biaya_jabatan,
+					iuran_pensiun: result.iuran_pensiun,
+					zakat: result.zakat,
+					neto_masa: result.neto_masa,
+					ptkp_yearly: result.ptkp_yearly,
+					pkp_annualized: result.pkp_annualized,
+					pph21_masa: result.pph21_masa,
+					notes: result.notes || null,
+					earnings_breakdown: earningsBreakdown.length > 0 ? earningsBreakdown : undefined,
+					deductions_breakdown: deductionsBreakdown.length > 0 ? deductionsBreakdown : undefined
+				};
+			});
 
 			const response = await calculatorApi.saveHistory({ calculations });
 			

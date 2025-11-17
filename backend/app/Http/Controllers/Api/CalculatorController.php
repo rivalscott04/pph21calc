@@ -480,6 +480,7 @@ class CalculatorController extends Controller
             'calculations.*.has_npwp' => 'required|boolean',
             'calculations.*.year' => 'required|integer|min:2000|max:2100',
             'calculations.*.month' => 'required|integer|min:1|max:12',
+            'calculations.*.calculation_mode' => 'nullable|in:monthly,yearly',
             'calculations.*.bruto' => 'required|numeric|min:0',
             'calculations.*.biaya_jabatan' => 'required|numeric|min:0',
             'calculations.*.iuran_pensiun' => 'required|numeric|min:0',
@@ -489,6 +490,14 @@ class CalculatorController extends Controller
             'calculations.*.pkp_annualized' => 'required|numeric',
             'calculations.*.pph21_masa' => 'required|numeric',
             'calculations.*.notes' => 'nullable|array',
+            'calculations.*.earnings_breakdown' => 'nullable|array',
+            'calculations.*.earnings_breakdown.*.component_id' => 'required_with:calculations.*.earnings_breakdown|exists:components,id',
+            'calculations.*.earnings_breakdown.*.monthly_amount' => 'required_with:calculations.*.earnings_breakdown|numeric|min:0',
+            'calculations.*.earnings_breakdown.*.annual_amount' => 'required_with:calculations.*.earnings_breakdown|numeric|min:0',
+            'calculations.*.deductions_breakdown' => 'nullable|array',
+            'calculations.*.deductions_breakdown.*.deduction_component_id' => 'required_with:calculations.*.deductions_breakdown|exists:deduction_components,id',
+            'calculations.*.deductions_breakdown.*.monthly_amount' => 'required_with:calculations.*.deductions_breakdown|numeric|min:0',
+            'calculations.*.deductions_breakdown.*.annual_amount' => 'required_with:calculations.*.deductions_breakdown|numeric|min:0',
         ]);
 
         $saved = [];
@@ -503,6 +512,7 @@ class CalculatorController extends Controller
                 'has_npwp' => $calcData['has_npwp'],
                 'year' => $calcData['year'],
                 'month' => $calcData['month'],
+                'calculation_mode' => $calcData['calculation_mode'] ?? 'monthly',
                 'bruto' => $calcData['bruto'],
                 'biaya_jabatan' => $calcData['biaya_jabatan'],
                 'iuran_pensiun' => $calcData['iuran_pensiun'],
@@ -512,6 +522,8 @@ class CalculatorController extends Controller
                 'pkp_annualized' => $calcData['pkp_annualized'],
                 'pph21_masa' => $calcData['pph21_masa'],
                 'notes' => $calcData['notes'] ?? null,
+                'earnings_breakdown' => $calcData['earnings_breakdown'] ?? null,
+                'deductions_breakdown' => $calcData['deductions_breakdown'] ?? null,
             ]);
 
             $saved[] = $history;

@@ -77,6 +77,18 @@ export interface BatchCalculationResponse {
 	results: BatchCalculationResult[];
 }
 
+export interface CalculationHistoryEarningBreakdown {
+	component_id: number;
+	monthly_amount: number;
+	annual_amount: number;
+}
+
+export interface CalculationHistoryDeductionBreakdown {
+	deduction_component_id: number;
+	monthly_amount: number;
+	annual_amount: number;
+}
+
 export interface CalculationHistory {
 	id: number;
 	tenant_id: number;
@@ -87,6 +99,7 @@ export interface CalculationHistory {
 	has_npwp: boolean;
 	year: number;
 	month: number;
+	calculation_mode?: 'monthly' | 'yearly';
 	bruto: number;
 	biaya_jabatan: number;
 	iuran_pensiun: number;
@@ -96,6 +109,8 @@ export interface CalculationHistory {
 	pkp_annualized: number;
 	pph21_masa: number;
 	notes: string[] | null;
+	earnings_breakdown?: CalculationHistoryEarningBreakdown[] | null;
+	deductions_breakdown?: CalculationHistoryDeductionBreakdown[] | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -108,6 +123,7 @@ export interface SaveHistoryRequest {
 		has_npwp: boolean;
 		year: number;
 		month: number;
+		calculation_mode?: 'monthly' | 'yearly';
 		bruto: number;
 		biaya_jabatan: number;
 		iuran_pensiun: number;
@@ -117,6 +133,8 @@ export interface SaveHistoryRequest {
 		pkp_annualized: number;
 		pph21_masa: number;
 		notes?: string[] | null;
+		earnings_breakdown?: CalculationHistoryEarningBreakdown[];
+		deductions_breakdown?: CalculationHistoryDeductionBreakdown[];
 	}>;
 }
 

@@ -21,6 +21,7 @@ class CalculationHistory extends Model
         'has_npwp',
         'year',
         'month',
+        'calculation_mode',
         'bruto',
         'biaya_jabatan',
         'iuran_pensiun',
@@ -30,6 +31,8 @@ class CalculationHistory extends Model
         'pkp_annualized',
         'pph21_masa',
         'notes',
+        'earnings_breakdown',
+        'deductions_breakdown',
     ];
 
     protected function casts(): array
@@ -38,6 +41,7 @@ class CalculationHistory extends Model
             'has_npwp' => 'boolean',
             'year' => 'integer',
             'month' => 'integer',
+            'calculation_mode' => 'string',
             'bruto' => 'decimal:2',
             'biaya_jabatan' => 'decimal:2',
             'iuran_pensiun' => 'decimal:2',
@@ -47,6 +51,8 @@ class CalculationHistory extends Model
             'pkp_annualized' => 'decimal:2',
             'pph21_masa' => 'decimal:2',
             'notes' => 'array',
+            'earnings_breakdown' => 'array',
+            'deductions_breakdown' => 'array',
         ];
     }
 

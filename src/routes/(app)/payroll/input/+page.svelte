@@ -6,7 +6,12 @@
 	import { employmentsApi, type Employment } from '$lib/api/employments.js';
 	import { componentsApi, type Component } from '$lib/api/components.js';
 	import { deductionComponentsApi, type DeductionComponent } from '$lib/api/deductionComponents.js';
-	import { calculatorApi, type CalculationHistory } from '$lib/api/calculator.js';
+import {
+	calculatorApi,
+	type CalculationHistory,
+	type CalculationHistoryEarningBreakdown,
+	type CalculationHistoryDeductionBreakdown
+} from '$lib/api/calculator.js';
 	import { toast } from '$lib/stores/toast.js';
 
 	let loading = true;
@@ -61,6 +66,48 @@
 		const num = parseInt(cleaned, 10);
 		return isNaN(num) ? 0 : num;
 	}
+
+function normalizeMonthlyFromBreakdown(
+	item: CalculationHistoryEarningBreakdown | CalculationHistoryDeductionBreakdown,
+	mode?: 'monthly' | 'yearly'
+): number {
+	if (item.monthly_amount !== undefined && item.monthly_amount !== null) {
+		return Math.max(0, Math.round(item.monthly_amount));
+	}
+
+	const annualAmount = item.annual_amount ?? 0;
+	if (!annualAmount) {
+		return 0;
+	}
+
+	if (mode === 'yearly') {
+		return Math.max(0, Math.round(annualAmount / 12));
+	}
+
+	if (mode === 'monthly') {
+		return Math.max(0, Math.round(annualAmount));
+	}
+
+	// Fallback: assume annual if very large, otherwise monthly
+	return annualAmount > 50000000 ? Math.max(0, Math.round(annualAmount / 12)) : Math.max(0, Math.round(annualAmount));
+}
+
+function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHistory): number {
+	if (!value || value <= 0) {
+		return 0;
+	}
+
+	if (history.calculation_mode === 'yearly') {
+		return Math.max(0, Math.round(value / 12));
+	}
+
+	if (history.calculation_mode === 'monthly') {
+		return Math.max(0, Math.round(value));
+	}
+
+	// Legacy heuristic: detect annual values by threshold
+	return value > 50000000 ? Math.max(0, Math.round(value / 12)) : Math.max(0, Math.round(value));
+}
 
 	function handleAmountInput(employmentId: number, componentId: number, event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
@@ -365,6 +412,8 @@
 
 			let importedCount = 0;
 			let skippedCount = 0;
+			const componentLookup = new Map(components.map(component => [component.id, component]));
+			const deductionComponentLookup = new Map(deductionComponents.map(dc => [dc.id, dc]));
 
 			// Import earnings (bruto) and deductions
 			histories.forEach((history) => {
@@ -380,90 +429,100 @@
 					return;
 				}
 
+				let importedForThisEmployment = false;
+
+				const earningsBreakdown = history.earnings_breakdown ?? [];
+				const deductionsBreakdown = history.deductions_breakdown ?? [];
+				const hasEarningsBreakdown = earningsBreakdown.length > 0;
+				const hasDeductionsBreakdown = deductionsBreakdown.length > 0;
+
 				// Import bruto as earnings - mapping ke Gaji Pokok
-				// Data di history dari kalkulator biasanya annual, jadi selalu bagi 12 untuk dapat bulanan
-				if (history.bruto > 0) {
+				if (hasEarningsBreakdown) {
 					if (!earnings.has(history.employment_id)) {
 						earnings.set(history.employment_id, new Map());
 					}
-					// Cek apakah sudah ada data untuk komponen ini
-					const existingAmount = earnings.get(history.employment_id)?.get(defaultComponent.id) || 0;
-					// Hanya import jika belum ada data (existingAmount === 0)
-					if (existingAmount === 0) {
-						let brutoValue = Number(history.bruto) || 0;
-						
-						// Cek apakah bruto adalah annual (dari kalkulator standalone biasanya > 50jt)
-						// Jika bruto > 50jt, pasti annual, bagi 12 untuk dapat bulanan
-						// Jika bruto <= 50jt, kemungkinan sudah bulanan, tidak perlu bagi 12
-						if (brutoValue > 50000000) {
-							// Annual, bagi 12 untuk dapat bulanan
-							brutoValue = Math.floor(brutoValue / 12);
+					const empEarnings = earnings.get(history.employment_id)!;
+
+					earningsBreakdown.forEach(item => {
+						const component = componentLookup.get(item.component_id);
+						if (!component) {
+							return;
 						}
-						// Jika bruto <= 50jt, sudah bulanan, langsung pakai
-						
-						brutoValue = Math.floor(brutoValue);
+						const monthlyAmount = normalizeMonthlyFromBreakdown(item, history.calculation_mode);
+						if (monthlyAmount > 0) {
+							empEarnings.set(component.id, monthlyAmount);
+							importedForThisEmployment = true;
+						}
+					});
+				} else if (history.bruto > 0) {
+					if (!earnings.has(history.employment_id)) {
+						earnings.set(history.employment_id, new Map());
+					}
+					const empEarnings = earnings.get(history.employment_id)!;
+					const existingAmount = empEarnings.get(defaultComponent.id) || 0;
+					if (existingAmount === 0) {
+						const brutoValue = normalizeMonthlyFromHistoryValue(Number(history.bruto) || 0, history);
 						if (brutoValue > 0) {
-							earnings.get(history.employment_id)!.set(defaultComponent.id, brutoValue);
+							empEarnings.set(defaultComponent.id, brutoValue);
+							importedForThisEmployment = true;
 						}
 					}
 				}
 
 				// Import deductions
-				// Data di history dari kalkulator biasanya annual, jadi selalu bagi 12 untuk dapat bulanan
-				if (history.iuran_pensiun > 0 || history.zakat > 0 || history.biaya_jabatan > 0) {
+				if (hasDeductionsBreakdown) {
 					if (!deductions.has(history.employment_id)) {
 						deductions.set(history.employment_id, new Map());
 					}
 					const empDeductions = deductions.get(history.employment_id)!;
-					
-					// Find deduction components by code
+					deductionsBreakdown.forEach(item => {
+						const deductionComponent = deductionComponentLookup.get(item.deduction_component_id);
+						if (!deductionComponent) {
+							return;
+						}
+						const monthlyAmount = normalizeMonthlyFromBreakdown(item, history.calculation_mode);
+						if (monthlyAmount > 0) {
+							empDeductions.set(deductionComponent.id, monthlyAmount);
+							importedForThisEmployment = true;
+						}
+					});
+				} else if (history.iuran_pensiun > 0 || history.zakat > 0 || history.biaya_jabatan > 0) {
+					if (!deductions.has(history.employment_id)) {
+						deductions.set(history.employment_id, new Map());
+					}
+					const empDeductions = deductions.get(history.employment_id)!;
+
 					const iuranPensiunComponent = deductionComponents.find(dc => dc.code === 'iuran_pensiun');
 					const zakatComponent = deductionComponents.find(dc => dc.code === 'zakat');
-					
-					// Cek apakah bruto adalah annual (jika bruto > 50jt, pasti annual)
-					const brutoValue = Number(history.bruto) || 0;
-					const isAnnual = brutoValue > 50000000;
-					
-					// Import iuran pensiun
+
 					if (iuranPensiunComponent && history.iuran_pensiun > 0) {
 						const existingAmount = empDeductions.get(iuranPensiunComponent.id) || 0;
 						if (existingAmount === 0) {
-							let value = Number(history.iuran_pensiun) || 0;
-							// Jika annual, bagi 12 untuk dapat bulanan
-							if (isAnnual && value > 0) {
-								value = Math.floor(value / 12);
+							const value = normalizeMonthlyFromHistoryValue(Number(history.iuran_pensiun) || 0, history);
+							if (value > 0) {
+								empDeductions.set(iuranPensiunComponent.id, value);
+								importedForThisEmployment = true;
 							}
-							// Safety check: jika value masih terlalu besar dibanding bruto bulanan
-							const brutoMonthly = isAnnual ? Math.floor(brutoValue / 12) : brutoValue;
-							if (value > brutoMonthly * 0.1) {
-								value = Math.floor(value / 12);
-							}
-							empDeductions.set(iuranPensiunComponent.id, Math.floor(value));
 						}
 					}
-					
-					// Import zakat
+
 					if (zakatComponent && history.zakat > 0) {
 						const existingAmount = empDeductions.get(zakatComponent.id) || 0;
 						if (existingAmount === 0) {
-							let value = Number(history.zakat) || 0;
-							// Jika annual, bagi 12 untuk dapat bulanan
-							if (isAnnual && value > 0) {
-								value = Math.floor(value / 12);
+							const value = normalizeMonthlyFromHistoryValue(Number(history.zakat) || 0, history);
+							if (value > 0) {
+								empDeductions.set(zakatComponent.id, value);
+								importedForThisEmployment = true;
 							}
-							// Safety check
-							const brutoMonthly = isAnnual ? Math.floor(brutoValue / 12) : brutoValue;
-							if (value > brutoMonthly * 0.1) {
-								value = Math.floor(value / 12);
-							}
-							empDeductions.set(zakatComponent.id, Math.floor(value));
 						}
 					}
-					
-					// Note: biaya_jabatan tidak perlu diimport karena auto-calculated
 				}
 
-				importedCount++;
+				if (importedForThisEmployment) {
+					importedCount++;
+				} else {
+					skippedCount++;
+				}
 			});
 
 			earningsUpdateTrigger++;
