@@ -22,7 +22,7 @@ const getApiBaseUrl = (): string => {
 	return envUrl;
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 export interface ApiError {
 	message: string;
@@ -169,24 +169,27 @@ export async function apiGet<T>(endpoint: string, params?: Record<string, any>):
 	});
 }
 
-export async function apiPost<T>(endpoint: string, data?: any): Promise<T> {
+export async function apiPost<T>(endpoint: string, data?: any, options: RequestInit = {}): Promise<T> {
 	return apiRequest<T>(endpoint, {
 		method: 'POST',
-		body: data ? JSON.stringify(data) : undefined
+		body: data ? JSON.stringify(data) : undefined,
+		...options
 	});
 }
 
-export async function apiPatch<T>(endpoint: string, data?: any): Promise<T> {
+export async function apiPatch<T>(endpoint: string, data?: any, options: RequestInit = {}): Promise<T> {
 	return apiRequest<T>(endpoint, {
 		method: 'PATCH',
-		body: data ? JSON.stringify(data) : undefined
+		body: data ? JSON.stringify(data) : undefined,
+		...options
 	});
 }
 
-export async function apiPut<T>(endpoint: string, data?: any): Promise<T> {
+export async function apiPut<T>(endpoint: string, data?: any, options: RequestInit = {}): Promise<T> {
 	return apiRequest<T>(endpoint, {
 		method: 'PUT',
-		body: data ? JSON.stringify(data) : undefined
+		body: data ? JSON.stringify(data) : undefined,
+		...options
 	});
 }
 
