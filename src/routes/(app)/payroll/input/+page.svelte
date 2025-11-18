@@ -691,10 +691,10 @@ function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHis
 
 <div class="space-y-6">
 	<!-- Header -->
-	<div class="flex justify-between items-center">
+	<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
 		<div>
-			<h1 class="text-3xl font-bold text-base-content">Input Data Payroll</h1>
-			<p class="text-base-content opacity-70 mt-1">
+			<h1 class="text-2xl sm:text-3xl font-bold text-base-content">Input Data Payroll</h1>
+			<p class="text-base-content opacity-70 mt-1 text-sm sm:text-base">
 				{#if period}
 					Periode: {period.year}-{String(period.month).padStart(2, '0')} 
 					<span class="badge badge-sm {period.status === 'draft' ? 'badge-neutral' : period.status === 'reviewed' ? 'badge-info' : period.status === 'approved' ? 'badge-success' : 'badge-primary'}">
@@ -705,7 +705,7 @@ function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHis
 				{/if}
 			</p>
 		</div>
-		<a href="/payroll" class="btn btn-ghost">
+		<a href="/payroll" class="btn btn-ghost w-full sm:w-auto">
 			<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
 			</svg>
@@ -798,14 +798,14 @@ function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHis
 		{#if activeTab === 'earnings'}
 			<div class="card bg-base-100 shadow-lg">
 				<div class="card-body">
-					<div class="flex justify-between items-center mb-4">
+					<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
 						<h2 class="card-title text-base-content">Input Earnings</h2>
-						<div class="flex gap-2">
-						<button 
-							class="btn btn-outline btn-neutral text-base-content hover:text-white"
-							on:click={importFromCalculator}
-							disabled={importing || !period}
-						>
+						<div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+							<button 
+								class="btn btn-outline btn-neutral text-base-content hover:text-white w-full sm:w-auto"
+								on:click={importFromCalculator}
+								disabled={importing || !period}
+							>
 								{#if importing}
 									<span class="loading loading-spinner loading-sm"></span>
 									Importing...
@@ -817,7 +817,7 @@ function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHis
 								{/if}
 							</button>
 							<button 
-								class="btn btn-brand text-white"
+								class="btn btn-brand text-white w-full sm:w-auto"
 								on:click={saveEarnings}
 								disabled={saving || !hasEarnings}
 							>
@@ -892,10 +892,10 @@ function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHis
 		{#if activeTab === 'deductions'}
 			<div class="card bg-base-100 shadow-lg">
 				<div class="card-body">
-					<div class="flex justify-between items-center mb-4">
+					<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
 						<h2 class="card-title text-base-content">Input Deductions</h2>
 						<button 
-							class="btn btn-brand text-white"
+							class="btn btn-brand text-white w-full sm:w-auto"
 							on:click={saveDeductions}
 							disabled={saving || !hasDeductions}
 						>
