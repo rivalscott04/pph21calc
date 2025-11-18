@@ -522,7 +522,7 @@ const tableSkeletonCols = Array.from({ length: 8 });
 							<label class="label" for={formFieldIds.type}>
 								<span class="label-text text-base-content font-medium">
 									Tipe <span class="text-error">*</span>
-									<div class="tooltip tooltip-right" data-tip="Wajib: komponen yang harus ada sesuai peraturan PPH21 (iuran pensiun, zakat). Custom: komponen tambahan yang bisa berbeda per tenant">
+									<div class="tooltip tooltip-right" data-tip="Wajib: komponen yang harus ada sesuai peraturan PPh 21 (Iuran Pensiun dan Biaya Jabatan). Custom: komponen tambahan yang opsional seperti Zakat atau komponen lainnya">
 										<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline ml-1 text-base-content opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 										</svg>
@@ -540,9 +540,9 @@ const tableSkeletonCols = Array.from({ length: 8 });
 							</select>
 							<p class="label-text-alt text-base-content opacity-70">
 								{#if formData.type === 'mandatory'}
-									Komponen wajib sesuai peraturan PPH21
+									Komponen wajib sesuai peraturan PPh 21 (Iuran Pensiun dan Biaya Jabatan)
 								{:else}
-									Komponen tambahan yang bisa dikustomisasi
+									Komponen opsional yang bisa dikustomisasi (contoh: Zakat)
 								{/if}
 							</p>
 						</div>

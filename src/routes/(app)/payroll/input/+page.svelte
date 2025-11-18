@@ -614,6 +614,30 @@ function normalizeMonthlyFromHistoryValue(value: number, history: CalculationHis
 	async function saveDeductions() {
 		if (!periodId) return;
 		
+		// Validasi mandatory deduction components (hanya yang manual, karena auto tidak perlu input)
+		// Menurut aturan PPh 21, yang wajib adalah Iuran Pensiun dan Biaya Jabatan
+		// Biaya Jabatan biasanya auto, jadi yang perlu divalidasi adalah Iuran Pensiun (jika manual)
+		const mandatoryDeductionComponents = deductionComponents.filter(
+			dc => dc.type === 'mandatory' && dc.calculation_type !== 'auto'
+		);
+		const missingMandatory: string[] = [];
+		
+		employments.forEach(employment => {
+			mandatoryDeductionComponents.forEach(deductionComponent => {
+				const empDeductions = deductions.get(employment.id);
+				const amount = empDeductions?.get(deductionComponent.id) || 0;
+				if (amount <= 0) {
+					missingMandatory.push(`${employment.person?.full_name || 'Pegawai'} - ${deductionComponent.name}`);
+				}
+			});
+		});
+		
+		if (missingMandatory.length > 0) {
+			toast.error(`Komponen wajib belum diisi: ${missingMandatory.slice(0, 3).join(', ')}${missingMandatory.length > 3 ? '...' : ''}`);
+			saving = false;
+			return;
+		}
+		
 		saving = true;
 		try {
 			const deductionsData: Array<{
