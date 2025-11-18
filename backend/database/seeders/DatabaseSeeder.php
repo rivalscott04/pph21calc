@@ -54,6 +54,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->command->info('Tenant Admin created: ntbs@mail.com / password');
+        
+        // Seed deduction components untuk semua tenant
+        $this->call(DeductionComponentSeeder::class);
+        
         $this->command->info('');
         $this->command->info('=== Login Credentials ===');
         $this->command->info('Superadmin: admin@tes.com / password');
